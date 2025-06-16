@@ -20,4 +20,6 @@ public partial class User
     public virtual ICollection<MeetingAttendee> MeetingAttendees { get; set; } = new List<MeetingAttendee>();
 
     public virtual ICollection<Meeting> Meetings { get; set; } = new List<Meeting>();
+
+    public virtual ICollection<Room> Rooms { get; set; } = new List<Room>();
 }

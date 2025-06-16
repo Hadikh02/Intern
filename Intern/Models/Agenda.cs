@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using Microsoft.AspNetCore.Mvc.ModelBinding.Validation;
-using System.Text.Json.Serialization;
+
 namespace Intern.Models;
 
 public partial class Agenda
@@ -19,7 +18,6 @@ public partial class Agenda
     public TimeOnly TimeAllocation { get; set; }
 
     public int MeetingId { get; set; }
-    [JsonIgnore]
-    [ValidateNever]
+
     public virtual Meeting Meeting { get; set; } = null!;
 }

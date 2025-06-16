@@ -100,9 +100,6 @@ namespace Intern.Controllers
             if (user == null)
                 return BadRequest($"User with ID {meeting.UserId} not found");
 
-            if (user.UserType != "Employee")
-                return BadRequest("Only employees can book meetings");
-
             // 3. Get and validate room
             var room = await _context.Rooms
                 .Include(r => r.Meetings)

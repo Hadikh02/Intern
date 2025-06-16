@@ -165,6 +165,10 @@ public partial class InternContext : DbContext
             entity.Property(e => e.Status)
                 .HasMaxLength(50)
                 .IsUnicode(false);
+
+            entity.HasOne(d => d.User).WithMany(p => p.Rooms)
+                .HasForeignKey(d => d.UserId)
+                .HasConstraintName("FK_Room_User");
         });
 
         modelBuilder.Entity<User>(entity =>

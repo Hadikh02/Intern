@@ -141,6 +141,11 @@ namespace Intern.Controllers
             {
                 return NotFound();
             }
+            var checkMinute = await _context.Minutes.AnyAsync(minute => minute.MeetingAttendeeId == id);
+            if (checkMinute)
+            {
+                return BadRequest($"The user with id {id} cannot be removed since you assign task for this user");
+            }
 
             _context.MeetingAttendees.Remove(meetingAttendee);
             await _context.SaveChangesAsync();

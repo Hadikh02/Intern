@@ -19,5 +19,9 @@ public partial class Room
 
     public int Capacity { get; set; }
 
+    public int? UserId { get; set; }
+
     public virtual ICollection<Meeting> Meetings { get; set; } = new List<Meeting>();
+
+    public virtual User? User { get; set; }
 }

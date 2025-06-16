@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using Microsoft.AspNetCore.Mvc.ModelBinding.Validation;
-using System.Text.Json.Serialization;
 
 namespace Intern.Models;
 
@@ -34,10 +32,8 @@ public partial class Meeting
     public virtual ICollection<Minute> Minutes { get; set; } = new List<Minute>();
 
     public virtual ICollection<Notification> Notifications { get; set; } = new List<Notification>();
-    [JsonIgnore]
-    [ValidateNever]
+
     public virtual Room Room { get; set; } = null!;
-    [JsonIgnore]
-    [ValidateNever]
+
     public virtual User User { get; set; } = null!;
 }
