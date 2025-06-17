@@ -6,29 +6,11 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Intern.Migrations
 {
     /// <inheritdoc />
-    public partial class UpdateAgendaMeetingRelation : Migration
+    public partial class InitialCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.CreateTable(
-                name: "Room",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    RoomNumber = table.Column<string>(type: "varchar(10)", unicode: false, maxLength: 10, nullable: false),
-                    Location = table.Column<string>(type: "varchar(100)", unicode: false, maxLength: 100, nullable: false),
-                    Status = table.Column<string>(type: "varchar(50)", unicode: false, maxLength: 50, nullable: true),
-                    HasVideo = table.Column<bool>(type: "bit", nullable: false),
-                    HasProjector = table.Column<bool>(type: "bit", nullable: false),
-                    Capacity = table.Column<int>(type: "int", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK__Room__3214EC07F7CC2ACE", x => x.Id);
-                });
-
             migrationBuilder.CreateTable(
                 name: "User",
                 columns: table => new
@@ -44,6 +26,30 @@ namespace Intern.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK__User__3214EC07C18C929F", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Room",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    RoomNumber = table.Column<string>(type: "varchar(10)", unicode: false, maxLength: 10, nullable: false),
+                    Location = table.Column<string>(type: "varchar(100)", unicode: false, maxLength: 100, nullable: false),
+                    Status = table.Column<string>(type: "varchar(50)", unicode: false, maxLength: 50, nullable: true),
+                    HasVideo = table.Column<bool>(type: "bit", nullable: false),
+                    HasProjector = table.Column<bool>(type: "bit", nullable: false),
+                    Capacity = table.Column<int>(type: "int", nullable: false),
+                    UserId = table.Column<int>(type: "int", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK__Room__3214EC07F7CC2ACE", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Room_User",
+                        column: x => x.UserId,
+                        principalTable: "User",
+                        principalColumn: "Id");
                 });
 
             migrationBuilder.CreateTable(
@@ -127,27 +133,6 @@ namespace Intern.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "Minute",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    MeetingId = table.Column<int>(type: "int", nullable: false),
-                    AssignAction = table.Column<string>(type: "varchar(500)", unicode: false, maxLength: 500, nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "datetime", nullable: false),
-                    DueDate = table.Column<DateTime>(type: "datetime", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK__Minute__3214EC07F2B69FFF", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK__Minute__MeetingI__45F365D3",
-                        column: x => x.MeetingId,
-                        principalTable: "Meeting",
-                        principalColumn: "Id");
-                });
-
-            migrationBuilder.CreateTable(
                 name: "Notification",
                 columns: table => new
                 {
@@ -164,6 +149,33 @@ namespace Intern.Migrations
                     table.PrimaryKey("PK__Notifica__20CF2E129E0B21BD", x => x.NotificationId);
                     table.ForeignKey(
                         name: "FK_Notification_Meeting",
+                        column: x => x.MeetingId,
+                        principalTable: "Meeting",
+                        principalColumn: "Id");
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Minute",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    MeetingId = table.Column<int>(type: "int", nullable: false),
+                    AssignAction = table.Column<string>(type: "varchar(500)", unicode: false, maxLength: 500, nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime", nullable: false),
+                    DueDate = table.Column<DateTime>(type: "datetime", nullable: false),
+                    MeetingAttendeeId = table.Column<int>(type: "int", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK__Minute__3214EC07F2B69FFF", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Minute_MeetingAttendee",
+                        column: x => x.MeetingAttendeeId,
+                        principalTable: "MeetingAttendee",
+                        principalColumn: "Id");
+                    table.ForeignKey(
+                        name: "FK__Minute__MeetingI__45F365D3",
                         column: x => x.MeetingId,
                         principalTable: "Meeting",
                         principalColumn: "Id");
@@ -195,6 +207,11 @@ namespace Intern.Migrations
                 column: "UserId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_Minute_MeetingAttendeeId",
+                table: "Minute",
+                column: "MeetingAttendeeId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Minute_MeetingId",
                 table: "Minute",
                 column: "MeetingId");
@@ -203,6 +220,11 @@ namespace Intern.Migrations
                 name: "IX_Notification_MeetingId",
                 table: "Notification",
                 column: "MeetingId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Room_UserId",
+                table: "Room",
+                column: "UserId");
 
             migrationBuilder.CreateIndex(
                 name: "UQ__User__A9D105347D00AED9",
@@ -218,13 +240,13 @@ namespace Intern.Migrations
                 name: "Agenda");
 
             migrationBuilder.DropTable(
-                name: "MeetingAttendee");
-
-            migrationBuilder.DropTable(
                 name: "Minute");
 
             migrationBuilder.DropTable(
                 name: "Notification");
+
+            migrationBuilder.DropTable(
+                name: "MeetingAttendee");
 
             migrationBuilder.DropTable(
                 name: "Meeting");

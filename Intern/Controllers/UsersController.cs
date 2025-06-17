@@ -1,10 +1,12 @@
 ﻿using AutoMapper;
 using Intern.DTOs;
 using Intern.Models;
+using Intern.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.VisualStudio.Web.CodeGenerators.Mvc.Templates.BlazorIdentity.Pages;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,8 +21,10 @@ namespace Intern.Controllers
     {
         private readonly InternContext _context;
         private readonly IMapper _mapper;
-        public UsersController(InternContext context, IMapper mapper)
+        private readonly IAuthService _authService;
+        public UsersController(IAuthService authService, InternContext context, IMapper mapper)
         {
+            _authService = authService;
             _context = context;
             _mapper = mapper;
         }
@@ -96,39 +100,72 @@ namespace Intern.Controllers
 
         // POST: api/Users
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPost]
-        [HttpPost]
-        public async Task<ActionResult<UserDto>> PostUser([FromBody] UserDto userDto)
+        [AllowAnonymous]
+        [HttpPost("register-auth")]
+        public async Task<ActionResult<UserDto>> RegisterWithAuth([FromBody] UserDto userDto)
         {
-            if (string.IsNullOrEmpty(userDto.FirstName))
+            if (string.IsNullOrWhiteSpace(userDto.FirstName) || userDto.FirstName.Trim().ToLower() == "string")
                 return BadRequest("User first name is required");
 
-            if (string.IsNullOrEmpty(userDto.LastName))
+            if (string.IsNullOrWhiteSpace(userDto.LastName) || userDto.LastName.Trim().ToLower() == "string")
                 return BadRequest("User last name is required");
 
-            if (string.IsNullOrEmpty(userDto.Email))
+            if (string.IsNullOrWhiteSpace(userDto.Email) || userDto.Email.Trim().ToLower() == "string")
                 return BadRequest("User email is required");
 
-            var emailExists = await _context.Users.AnyAsync(u => u.Email == userDto.Email);
-            if (emailExists)
-                return BadRequest("Please choose another email.");
-
-            if (string.IsNullOrEmpty(userDto.Password))
+            if (string.IsNullOrWhiteSpace(userDto.Password) || userDto.Password.Trim() == "string")
                 return BadRequest("User password is required");
 
-            if (string.IsNullOrEmpty(userDto.UserType))
+            if (string.IsNullOrWhiteSpace(userDto.UserType) || userDto.UserType.Trim() =="string")
                 return BadRequest("User type is required");
 
-            var user = _mapper.Map<User>(userDto); // Convert DTO to entity
+            var newUser = await _authService.RegisterAsync(userDto);
 
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
+            if (newUser == null)
+                return BadRequest("Email already exists.");
 
-            var resultDto = _mapper.Map<UserDto>(user); // Convert back to DTO
-            return CreatedAtAction("GetUser", new { id = user.Id }, resultDto);
+            var resultDto = _mapper.Map<UserDto>(newUser);
+            return CreatedAtAction(nameof(GetUser), new { id = newUser.Id }, resultDto);
+        }
+        [AllowAnonymous]
+        [HttpPost("login")]
+        public async Task<ActionResult<TokenResponseDto>> Login([FromBody] LoginDto loginDto)
+        {
+            if (string.IsNullOrWhiteSpace(loginDto.Email) || loginDto.Email.Trim().ToLower() == "string")
+                return BadRequest("User email is required");
+
+            if (string.IsNullOrWhiteSpace(loginDto.Password) || loginDto.Password.Trim() == "string")
+                return BadRequest("User password is required");
+
+            var result = await _authService.LoginAsync(loginDto);
+            if (result == null) return BadRequest("Invalid email or password");
+            return Ok(result);
+        }
+        [AllowAnonymous]
+        [HttpPost("refresh-token")]
+        public async Task<ActionResult<TokenResponseDto>> RefreshToken(RefreshTokenRequestDto request)
+        {
+            var result = await _authService.RefreshTokenAsync(request);
+            if(result == null || result.AccessToken == null || request.RefreshToken == null)
+            {
+                return Unauthorized("Invalid refresh token.");
+            }
+            return Ok(result);
         }
 
+        [Authorize]
+        [HttpGet("Authenticate")]
+        public IActionResult AuthenticatedOnlyEndpoint()
+        {
+            return Ok("you are authinticated");
+        }
 
+        [Authorize(Roles ="Admin")]
+        [HttpGet("admin-only")]
+        public IActionResult AdminOnlyEndpoint()
+        {
+            return Ok("you are an admin");
+        }
         // DELETE: api/Users/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteUser(int id)

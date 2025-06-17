@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Intern.Migrations
 {
     [DbContext(typeof(InternContext))]
-    [Migration("20250614100918_UpdateAgendaMeetingRelation")]
-    partial class UpdateAgendaMeetingRelation
+    [Migration("20250617201639_UpdateRefreshTokenExpiryType")]
+    partial class UpdateRefreshTokenExpiryType
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -179,11 +179,16 @@ namespace Intern.Migrations
                     b.Property<DateTime>("DueDate")
                         .HasColumnType("datetime");
 
+                    b.Property<int?>("MeetingAttendeeId")
+                        .HasColumnType("int");
+
                     b.Property<int>("MeetingId")
                         .HasColumnType("int");
 
                     b.HasKey("Id")
                         .HasName("PK__Minute__3214EC07F2B69FFF");
+
+                    b.HasIndex("MeetingAttendeeId");
 
                     b.HasIndex("MeetingId");
 
@@ -261,8 +266,13 @@ namespace Intern.Migrations
                         .IsUnicode(false)
                         .HasColumnType("varchar(50)");
 
+                    b.Property<int?>("UserId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id")
                         .HasName("PK__Room__3214EC07F7CC2ACE");
+
+                    b.HasIndex("UserId");
 
                     b.ToTable("Room", (string)null);
                 });
@@ -299,6 +309,12 @@ namespace Intern.Migrations
                         .IsUnicode(false)
                         .HasColumnType("varchar(255)");
 
+                    b.Property<string>("RefreshToken")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("RefreshTokenExpiryTime")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("UserType")
                         .HasMaxLength(20)
                         .IsUnicode(false)
@@ -316,7 +332,7 @@ namespace Intern.Migrations
             modelBuilder.Entity("Intern.Models.Agenda", b =>
                 {
                     b.HasOne("Intern.Models.Meeting", "Meeting")
-                        .WithMany("Agendas")
+                        .WithMany("Agenda")
                         .HasForeignKey("MeetingId")
                         .IsRequired()
                         .HasConstraintName("FK_Agenda_Meeting");
@@ -364,6 +380,11 @@ namespace Intern.Migrations
 
             modelBuilder.Entity("Intern.Models.Minute", b =>
                 {
+                    b.HasOne("Intern.Models.MeetingAttendee", "MeetingAttendee")
+                        .WithMany("Minutes")
+                        .HasForeignKey("MeetingAttendeeId")
+                        .HasConstraintName("FK_Minute_MeetingAttendee");
+
                     b.HasOne("Intern.Models.Meeting", "Meeting")
                         .WithMany("Minutes")
                         .HasForeignKey("MeetingId")
@@ -371,6 +392,8 @@ namespace Intern.Migrations
                         .HasConstraintName("FK__Minute__MeetingI__45F365D3");
 
                     b.Navigation("Meeting");
+
+                    b.Navigation("MeetingAttendee");
                 });
 
             modelBuilder.Entity("Intern.Models.Notification", b =>
@@ -384,15 +407,30 @@ namespace Intern.Migrations
                     b.Navigation("Meeting");
                 });
 
+            modelBuilder.Entity("Intern.Models.Room", b =>
+                {
+                    b.HasOne("Intern.Models.User", "User")
+                        .WithMany("Rooms")
+                        .HasForeignKey("UserId")
+                        .HasConstraintName("FK_Room_User");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Intern.Models.Meeting", b =>
                 {
-                    b.Navigation("Agendas");
+                    b.Navigation("Agenda");
 
                     b.Navigation("MeetingAttendees");
 
                     b.Navigation("Minutes");
 
                     b.Navigation("Notifications");
+                });
+
+            modelBuilder.Entity("Intern.Models.MeetingAttendee", b =>
+                {
+                    b.Navigation("Minutes");
                 });
 
             modelBuilder.Entity("Intern.Models.Room", b =>
@@ -405,6 +443,8 @@ namespace Intern.Migrations
                     b.Navigation("MeetingAttendees");
 
                     b.Navigation("Meetings");
+
+                    b.Navigation("Rooms");
                 });
 #pragma warning restore 612, 618
         }

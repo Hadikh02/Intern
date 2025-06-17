@@ -16,6 +16,8 @@ public partial class User
     public string Password { get; set; } = null!;
 
     public string? UserType { get; set; }
+    public string? RefreshToken {  get; set; }
+    public DateTime? RefreshTokenExpiryTime { get; set; }
 
     public virtual ICollection<MeetingAttendee> MeetingAttendees { get; set; } = new List<MeetingAttendee>();
 
