@@ -1,5 +1,6 @@
-
+using Intern.Mapping;
 using Intern.Models;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 
@@ -12,13 +13,13 @@ builder.Services.AddControllers()
     {
         options.SerializerSettings.ReferenceLoopHandling = ReferenceLoopHandling.Ignore;
     });
-
 // Add your DbContext
 builder.Services.AddDbContext<InternContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("InternDB")));
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddAutoMapper(typeof(MappingProfile));
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -29,6 +30,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.UseAuthentication();
 
 app.UseAuthorization();
 

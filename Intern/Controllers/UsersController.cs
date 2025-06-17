@@ -1,23 +1,28 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using AutoMapper;
+using Intern.DTOs;
+using Intern.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Intern.Models;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace Intern.Controllers
 {
+    [Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class UsersController : ControllerBase
     {
         private readonly InternContext _context;
-
-        public UsersController(InternContext context)
+        private readonly IMapper _mapper;
+        public UsersController(InternContext context, IMapper mapper)
         {
             _context = context;
+            _mapper = mapper;
         }
 
         // GET: api/Users
@@ -92,41 +97,37 @@ namespace Intern.Controllers
         // POST: api/Users
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<User>> PostUser(User user)
+        [HttpPost]
+        public async Task<ActionResult<UserDto>> PostUser([FromBody] UserDto userDto)
         {
-            if (string.IsNullOrEmpty(user.FirstName))
-            {
+            if (string.IsNullOrEmpty(userDto.FirstName))
                 return BadRequest("User first name is required");
-            }
-            if (string.IsNullOrEmpty(user.LastName))
-            {
+
+            if (string.IsNullOrEmpty(userDto.LastName))
                 return BadRequest("User last name is required");
 
-            }
-            if (string.IsNullOrEmpty(user.Email))
-            {
+            if (string.IsNullOrEmpty(userDto.Email))
                 return BadRequest("User email is required");
-            }
-            var emailExists = await _context.Users.AnyAsync(u => u.Email == user.Email);
-            if (emailExists)
-            {
-                return BadRequest("Please choose another email.");
-            }
 
-            if (string.IsNullOrEmpty(user.Password))
-            {
+            var emailExists = await _context.Users.AnyAsync(u => u.Email == userDto.Email);
+            if (emailExists)
+                return BadRequest("Please choose another email.");
+
+            if (string.IsNullOrEmpty(userDto.Password))
                 return BadRequest("User password is required");
-            }
-            if (string.IsNullOrEmpty(user.UserType))
-            {
+
+            if (string.IsNullOrEmpty(userDto.UserType))
                 return BadRequest("User type is required");
-            }
+
+            var user = _mapper.Map<User>(userDto); // Convert DTO to entity
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction("GetUser", new { id = user.Id }, user);
+            var resultDto = _mapper.Map<UserDto>(user); // Convert back to DTO
+            return CreatedAtAction("GetUser", new { id = user.Id }, resultDto);
         }
+
 
         // DELETE: api/Users/5
         [HttpDelete("{id}")]

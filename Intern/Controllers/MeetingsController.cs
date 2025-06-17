@@ -1,11 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using AutoMapper;
+using Intern.DTOs;
+using Intern.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Intern.Models;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace Intern.Controllers
 {
@@ -14,10 +16,11 @@ namespace Intern.Controllers
     public class MeetingsController : ControllerBase
     {
         private readonly InternContext _context;
-
-        public MeetingsController(InternContext context)
+        private readonly IMapper _mapper;
+        public MeetingsController(InternContext context, IMapper mapper)
         {
             _context = context;
+            _mapper = mapper;
         }
 
         // GET: api/Meetings
@@ -80,72 +83,56 @@ namespace Intern.Controllers
         // POST: api/Meetings
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<Meeting>> PostMeeting([FromBody] Meeting meeting)
+        public async Task<ActionResult<Meeting>> PostMeeting([FromBody] MeetingDto meetingDto)
         {
-            // 1. Basic validations
-            if (meeting.UserId <= 0)
-                return BadRequest("User Id is required and must be greater than 0");
+            if (meetingDto.UserId <= 0)
+                return BadRequest("User Id is required");
 
-            if (meeting.RoomId <= 0)
-                return BadRequest("Room Id is required and must be greater than 0");
+            if (meetingDto.RoomId <= 0)
+                return BadRequest("Room Id is required");
 
-            if (string.IsNullOrWhiteSpace(meeting.Title))
+            if (string.IsNullOrWhiteSpace(meetingDto.Title))
                 return BadRequest("Meeting title is required");
 
-            if (meeting.EndTime <= meeting.StartTime)
+            if (meetingDto.EndTime <= meetingDto.StartTime)
                 return BadRequest("End time must be after start time");
 
-            // 2. Verify user exists and is employee
-            var user = await _context.Users.FindAsync(meeting.UserId);
+            var user = await _context.Users.FindAsync(meetingDto.UserId);
             if (user == null)
-                return BadRequest($"User with ID {meeting.UserId} not found");
+                return BadRequest($"User with ID {meetingDto.UserId} not found");
 
-            // 3. Get and validate room
-            var room = await _context.Rooms
-                .Include(r => r.Meetings)
-                .FirstOrDefaultAsync(r => r.Id == meeting.RoomId);
+            var room = await _context.Rooms.Include(r => r.Meetings)
+                                           .FirstOrDefaultAsync(r => r.Id == meetingDto.RoomId);
 
             if (room == null)
-                return BadRequest($"Room with ID {meeting.RoomId} not found");
+                return BadRequest($"Room with ID {meetingDto.RoomId} not found");
 
             if (room.Status != "Available")
                 return Conflict($"Room {room.RoomNumber} is currently {room.Status}");
 
-            // 4. Check for time conflicts
             var timeConflict = room.Meetings.Any(m =>
-                m.MeetingDate == meeting.MeetingDate &&
-                m.StartTime < meeting.EndTime &&
-                m.EndTime > meeting.StartTime);
+                m.MeetingDate == meetingDto.MeetingDate &&
+                m.StartTime < meetingDto.EndTime &&
+                m.EndTime > meetingDto.StartTime);
 
             if (timeConflict)
                 return Conflict("Room is already booked during the requested time");
 
-            // 5. Update room status
             room.Status = "Not Available";
             _context.Rooms.Update(room);
 
-            // 6. Set meeting defaults
+            var meeting = _mapper.Map<Meeting>(meetingDto);
+
             meeting.RecordingPath ??= string.Empty;
-            if (meeting.IsRecorded && meeting.RecordingUploadedAt == default)
+            if (meeting.IsRecorded && meeting.RecordingUploadedAt == null)
                 meeting.RecordingUploadedAt = DateOnly.FromDateTime(DateTime.UtcNow);
 
-            // 7. Save changes
             _context.Meetings.Add(meeting);
             await _context.SaveChangesAsync();
 
-            // 8. Return response
-            return CreatedAtAction(nameof(GetMeeting), new { id = meeting.Id }, new
-            {
-                meeting.Id,
-                meeting.Title,
-                Organizer = new { user.Id, user.FirstName, user.LastName },
-                Room = new { room.Id, room.RoomNumber, room.Location },
-                meeting.MeetingDate,
-                meeting.StartTime,
-                meeting.EndTime,
-                room.Status
-            });
+            return CreatedAtAction(nameof(GetMeeting), new { id = meeting.Id }, meeting);
         }
+
 
         // DELETE: api/Meetings/5
         [HttpDelete("{id}")]

@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Intern.Models;
+using Intern.DTOs;
+using AutoMapper;
 
 namespace Intern.Controllers
 {
@@ -14,10 +16,12 @@ namespace Intern.Controllers
     public class AgendaController : ControllerBase
     {
         private readonly InternContext _context;
+        private readonly IMapper _mapper;
 
-        public AgendaController(InternContext context)
+        public AgendaController(InternContext context, IMapper mapper)
         {
             _context = context;
+            _mapper = mapper;
         }
 
         // GET: api/Agenda
@@ -75,12 +79,36 @@ namespace Intern.Controllers
         // POST: api/Agenda
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<Agenda>> PostAgenda(Agenda agenda)
+        public async Task<ActionResult<Agenda>> PostAgenda([FromBody] AgendaDto agendaDto)
         {
+            if (string.IsNullOrWhiteSpace(agendaDto.Topic))
+                return BadRequest("Topic is required");
+
+            if (string.IsNullOrWhiteSpace(agendaDto.Description))
+                return BadRequest("Description is required");
+
+            if (string.IsNullOrWhiteSpace(agendaDto.Status))
+                return BadRequest("Status is required");
+
+            if (string.IsNullOrWhiteSpace(agendaDto.ItemNumber))
+                return BadRequest("ItemNumber is required");
+
+            if (agendaDto.MeetingId <= 0)
+                return BadRequest("MeetingId is required and must be greater than 0");
+            var meetingExists = await _context.Meetings.FindAsync(agendaDto.MeetingId);
+            if (meetingExists == null)
+                return BadRequest($"Meeting with Id {agendaDto.MeetingId} not found");
+
+
+            var agenda = _mapper.Map<Agenda>(agendaDto);
+
             _context.Agenda.Add(agenda);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction("GetAgenda", new { id = agenda.Id }, agenda);
+            // Map back to DTO to return
+            var resultDto = _mapper.Map<AgendaDto>(agenda);
+
+            return CreatedAtAction("GetAgenda", new { id = agenda.Id }, resultDto);
         }
 
         // DELETE: api/Agenda/5

@@ -1,9 +1,11 @@
-﻿using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using AutoMapper;
+using Intern.DTOs;
+using Intern.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Intern.Models;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace Intern.Controllers
 {
@@ -12,10 +14,12 @@ namespace Intern.Controllers
     public class RoomController : ControllerBase
     {
         private readonly InternContext _context;
+        private readonly IMapper _mapper;
 
-        public RoomController(InternContext context)
+        public RoomController(InternContext context, IMapper mapper)
         {
             _context = context;
+            _mapper = mapper;
         }
 
         // GET: api/Room
@@ -95,34 +99,33 @@ namespace Intern.Controllers
         // POST: api/Room
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<Room>> PostRoom(Room room)
+        public async Task<ActionResult<RoomDto>> PostRoom([FromBody] RoomDto roomDto)
         {
-            if (string.IsNullOrEmpty(room.RoomNumber))
-            {
+            if (string.IsNullOrEmpty(roomDto.RoomNumber))
                 return BadRequest("Room number is required");
-            }
-            var roomNumber = await _context.Rooms.AnyAsync(r => r.RoomNumber == room.RoomNumber);
-            if (roomNumber)
-            {
-                return BadRequest($"The room number {room.RoomNumber} already exists");
-            }
-            if (string.IsNullOrEmpty(room.Location))
-            {
+
+            var roomExists = await _context.Rooms.AnyAsync(r => r.RoomNumber == roomDto.RoomNumber);
+            if (roomExists)
+                return BadRequest($"The room number {roomDto.RoomNumber} already exists");
+
+            if (string.IsNullOrEmpty(roomDto.Location))
                 return BadRequest("Room location is required");
-            }
-            if (string.IsNullOrEmpty(room.Status))
-            {
+
+            if (string.IsNullOrEmpty(roomDto.Status))
                 return BadRequest("Room status is required");
-            }
-            if (room.Capacity <= 0)
-            {
-                return BadRequest("Room capacity is required and must be greater than 0");
-            }
+
+            if (roomDto.Capacity <= 0)
+                return BadRequest("Room capacity must be greater than 0");
+
+            var room = _mapper.Map<Room>(roomDto);
+
             _context.Rooms.Add(room);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetRoom), new { id = room.Id }, room);
+            var resultDto = _mapper.Map<RoomDto>(room);
+            return CreatedAtAction(nameof(GetRoom), new { id = room.Id }, resultDto);
         }
+
 
         // DELETE: api/Room/5
         [HttpDelete("{id}")]
