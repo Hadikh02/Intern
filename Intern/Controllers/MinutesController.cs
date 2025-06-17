@@ -94,8 +94,6 @@ namespace Intern.Controllers
             if (attendee == null)
                 return BadRequest($"Attendee with Id {minute.MeetingAttendeeId} not found");
 
-            if (attendee.User.UserType != "Employee")
-                return BadRequest("Only employees can assign actions to attendees");
 
             _context.Minutes.Add(minute);
             await _context.SaveChangesAsync();

@@ -1,4 +1,4 @@
-using Intern.BackgroundServices;
+
 using Intern.Models;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
@@ -19,7 +19,6 @@ builder.Services.AddDbContext<InternContext>(options =>
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-builder.Services.AddHostedService<RoomStatusBackgroundService>();
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
