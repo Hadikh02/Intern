@@ -50,7 +50,7 @@ namespace Intern.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> PutNotification(int id, Notification notification)
         {
-            if (id != notification.NotificationId)
+            if (id != notification.Id)
             {
                 return BadRequest();
             }
@@ -105,7 +105,7 @@ namespace Intern.Controllers
 
             var resultDto = _mapper.Map<NotificationDto>(notification);
 
-            return CreatedAtAction("GetNotification", new { id = notification.NotificationId }, resultDto);
+            return CreatedAtAction("GetNotification", new { id = notification.Id }, resultDto);
         }
 
 
@@ -127,7 +127,7 @@ namespace Intern.Controllers
 
         private bool NotificationExists(int id)
         {
-            return _context.Notifications.Any(e => e.NotificationId == id);
+            return _context.Notifications.Any(e => e.Id == id);
         }
     }
 }

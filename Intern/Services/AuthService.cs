@@ -52,6 +52,7 @@ namespace Intern.Services
             user.UserType = request.UserType;
             user.Email = request.Email;
             user.Password = hashedPassword;
+            user.UserType = request.UserType;
 
             context.Users.Add(user);
             await context.SaveChangesAsync();

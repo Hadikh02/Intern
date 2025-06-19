@@ -132,7 +132,7 @@ public partial class InternContext : DbContext
 
         modelBuilder.Entity<Notification>(entity =>
         {
-            entity.HasKey(e => e.NotificationId).HasName("PK__Notifica__20CF2E129E0B21BD");
+            entity.HasKey(e => e.Id).HasName("PK__Notifica__20CF2E129E0B21BD");
 
             entity.ToTable("Notification");
 
