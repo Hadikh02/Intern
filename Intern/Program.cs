@@ -7,6 +7,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Newtonsoft.Json;
 using Scalar.AspNetCore;
+using System.Security.Claims;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -43,7 +44,9 @@ builder.Services.AddAuthentication(options =>
         ValidIssuer = builder.Configuration["AppSettings:Issuer"],
         ValidAudience = builder.Configuration["AppSettings:Audience"],
         IssuerSigningKey = new SymmetricSecurityKey(
-            Encoding.UTF8.GetBytes(builder.Configuration["AppSettings:Token"]))
+            Encoding.UTF8.GetBytes(builder.Configuration["AppSettings:Token"])),
+
+        RoleClaimType = ClaimTypes.Role  // <-- This is required for role-based authorization
     };
 });
 

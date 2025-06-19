@@ -10,6 +10,8 @@ using Microsoft.VisualStudio.Web.CodeGenerators.Mvc.Templates.BlazorIdentity.Pag
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Mail;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace Intern.Controllers
@@ -59,25 +61,50 @@ namespace Intern.Controllers
             {
                 return BadRequest();
             }
+
             if (string.IsNullOrWhiteSpace(user.FirstName))
             {
                 return BadRequest("First name is required");
             }
+            if (!Regex.IsMatch(user.FirstName, "^[A-Z][a-z]+$"))
+            {
+                return BadRequest("First name must start with a capital letter followed by lowercase letters only (e.g., 'John').");
+            }
+
             if (string.IsNullOrWhiteSpace(user.LastName))
             {
                 return BadRequest("Last name is required");
             }
+            if (!Regex.IsMatch(user.LastName, "^[A-Z][a-z]+$"))
+            {
+                return BadRequest("Last name must start with a capital letter followed by lowercase letters only (e.g., 'Doe').");
+            }
+
             var checkEmail = await _context.Users.AnyAsync(u => u.Email == user.Email && u.Id != id);
             if (checkEmail)
             {
                 return BadRequest("Please choose another email address");
             }
-            if (string.IsNullOrWhiteSpace(user.Password))
+
+            var email = user.Email.Trim();
+            var emailValidationResult = ValidateEmail(email);
+            if (!emailValidationResult.IsValid)
             {
-                return BadRequest("Password is required");
+                return BadRequest(emailValidationResult.ErrorMessage);
             }
 
-            _context.Entry(user).State = EntityState.Modified;
+            // Load the existing user
+            var existingUser = await _context.Users.FindAsync(id);
+            if (existingUser == null)
+            {
+                return NotFound();
+            }
+
+            // Update only allowed fields
+            existingUser.FirstName = user.FirstName;
+            existingUser.LastName = user.LastName;
+            existingUser.Email = email;
+            // Password is not updated here
 
             try
             {
@@ -98,74 +125,6 @@ namespace Intern.Controllers
             return NoContent();
         }
 
-        // POST: api/Users
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [AllowAnonymous]
-        [HttpPost("register-auth")]
-        public async Task<ActionResult<UserDto>> RegisterWithAuth([FromBody] UserDto userDto)
-        {
-            if (string.IsNullOrWhiteSpace(userDto.FirstName) || userDto.FirstName.Trim().ToLower() == "string")
-                return BadRequest("User first name is required");
-
-            if (string.IsNullOrWhiteSpace(userDto.LastName) || userDto.LastName.Trim().ToLower() == "string")
-                return BadRequest("User last name is required");
-
-            if (string.IsNullOrWhiteSpace(userDto.Email) || userDto.Email.Trim().ToLower() == "string")
-                return BadRequest("User email is required");
-
-            if (string.IsNullOrWhiteSpace(userDto.Password) || userDto.Password.Trim() == "string")
-                return BadRequest("User password is required");
-
-            if (string.IsNullOrWhiteSpace(userDto.UserType) || userDto.UserType.Trim() =="string")
-                return BadRequest("User type is required");
-
-            var newUser = await _authService.RegisterAsync(userDto);
-
-            if (newUser == null)
-                return BadRequest("Email already exists.");
-
-            var resultDto = _mapper.Map<UserDto>(newUser);
-            return CreatedAtAction(nameof(GetUser), new { id = newUser.Id }, resultDto);
-        }
-        [AllowAnonymous]
-        [HttpPost("login")]
-        public async Task<ActionResult<TokenResponseDto>> Login([FromBody] LoginDto loginDto)
-        {
-            if (string.IsNullOrWhiteSpace(loginDto.Email) || loginDto.Email.Trim().ToLower() == "string")
-                return BadRequest("User email is required");
-
-            if (string.IsNullOrWhiteSpace(loginDto.Password) || loginDto.Password.Trim() == "string")
-                return BadRequest("User password is required");
-
-            var result = await _authService.LoginAsync(loginDto);
-            if (result == null) return BadRequest("Invalid email or password");
-            return Ok(result);
-        }
-        [AllowAnonymous]
-        [HttpPost("refresh-token")]
-        public async Task<ActionResult<TokenResponseDto>> RefreshToken(RefreshTokenRequestDto request)
-        {
-            var result = await _authService.RefreshTokenAsync(request);
-            if(result == null || result.AccessToken == null || request.RefreshToken == null)
-            {
-                return Unauthorized("Invalid refresh token.");
-            }
-            return Ok(result);
-        }
-
-        [Authorize]
-        [HttpGet("Authenticate")]
-        public IActionResult AuthenticatedOnlyEndpoint()
-        {
-            return Ok("you are authinticated");
-        }
-
-        [Authorize(Roles ="Admin")]
-        [HttpGet("admin-only")]
-        public IActionResult AdminOnlyEndpoint()
-        {
-            return Ok("you are an admin");
-        }
         // DELETE: api/Users/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteUser(int id)
@@ -186,6 +145,61 @@ namespace Intern.Controllers
             await _context.SaveChangesAsync();
 
             return NoContent();
+        }
+        private (bool IsValid, string ErrorMessage) ValidateEmail(string email)
+        {
+            // 1. Basic format check (must contain @ and a dot in domain)
+            var regex = new Regex(@"^[^@\s]+@[^@\s]+\.[^@\s]+$");
+            if (!regex.IsMatch(email))
+            {
+                return (false, "Invalid email format. Example: yourname@example.com");
+            }
+
+            // 2. Extract TLD (text after the last dot)
+            string tld = email.Split('.').Last().ToLower();
+
+            // 3. Check if TLD is valid (use a predefined list)
+            if (!IsValidTld(tld))
+            {
+                return (false, $"Invalid domain extension (.{tld}). Use a valid one like .com, .net, .org, etc.");
+            }
+
+            // 4. MailAddress validation (strict check)
+            try
+            {
+                var mailAddress = new MailAddress(email);
+                if (mailAddress.Address != email)
+                {
+                    return (false, "Email contains invalid characters.");
+                }
+
+                // 5. Additional checks (optional)
+                if (email.Contains("..") || email.StartsWith(".") || email.EndsWith("."))
+                {
+                    return (false, "email cannot have consecutive, leading, or trailing dots (.)");
+                }
+
+                return (true, null);
+            }
+            catch
+            {
+                return (false, "Email address is not valid. Please check and try again.");
+            }
+        }
+
+        // Check if TLD is valid (use a predefined list)
+        private bool IsValidTld(string tld)
+        {
+            // List of valid TLDs (you can expand this)
+            var validTlds = new HashSet<string>
+    {
+        // Generic TLDs
+        "com", "net", "org", "io", "co", "gov", "edu", "info", "biz",
+        // Country-code TLDs
+        "uk", "us", "ca", "au", "de", "fr", "in", "jp", "br", "mx"
+    };
+
+            return validTlds.Contains(tld);
         }
 
         private bool UserExists(int id)

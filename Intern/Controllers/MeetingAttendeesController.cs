@@ -1,11 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using Intern.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Intern.Models;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace Intern.Controllers
 {
@@ -21,6 +22,7 @@ namespace Intern.Controllers
         }
 
         // GET: api/MeetingAttendees
+        [Authorize(Roles = "Admin,Employee")]
         [HttpGet]
         public async Task<ActionResult<IEnumerable<MeetingAttendee>>> GetMeetingAttendees()
         {
@@ -28,6 +30,7 @@ namespace Intern.Controllers
         }
 
         // GET: api/MeetingAttendees/5
+        [Authorize(Roles = "Admin,Employee")]
         [HttpGet("{id}")]
         public async Task<ActionResult<MeetingAttendee>> GetMeetingAttendee(int id)
         {
@@ -43,6 +46,7 @@ namespace Intern.Controllers
 
         // PUT: api/MeetingAttendees/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
+        [Authorize(Roles = "Admin,Employee")]
         [HttpPut("{id}")]
         public async Task<IActionResult> PutMeetingAttendee(int id, MeetingAttendee meetingAttendee)
         {
@@ -71,7 +75,7 @@ namespace Intern.Controllers
 
             return NoContent();
         }
-
+        [Authorize(Roles = "Admin,Employee")]
         [HttpPost]
         public async Task<ActionResult<MeetingAttendee>> PostMeetingAttendee([FromBody] MeetingAttendee meetingAttendee)
         {
@@ -133,6 +137,7 @@ namespace Intern.Controllers
             });
         }
         // DELETE: api/MeetingAttendees/5
+          [Authorize(Roles = "Admin,Employee")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteMeetingAttendee(int id)
         {

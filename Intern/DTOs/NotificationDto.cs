@@ -2,7 +2,7 @@
 {
     public class NotificationDto
     {
-        public int NotificationId { get; set; }
+        public int Id { get; set; }
 
         public string EventType { get; set; } = null!;
 

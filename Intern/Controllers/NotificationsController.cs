@@ -1,6 +1,7 @@
 ﻿using AutoMapper;
 using Intern.DTOs;
 using Intern.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -25,6 +26,7 @@ namespace Intern.Controllers
         }
 
         // GET: api/Notifications
+        [Authorize(Roles = "Admin,Employee")]
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Notification>>> GetNotifications()
         {
@@ -32,6 +34,7 @@ namespace Intern.Controllers
         }
 
         // GET: api/Notifications/5
+        [Authorize(Roles = "Admin,Employee")]
         [HttpGet("{id}")]
         public async Task<ActionResult<Notification>> GetNotification(int id)
         {
@@ -47,6 +50,7 @@ namespace Intern.Controllers
 
         // PUT: api/Notifications/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
+        [Authorize(Roles = "Admin,Employee")]
         [HttpPut("{id}")]
         public async Task<IActionResult> PutNotification(int id, Notification notification)
         {
@@ -78,6 +82,7 @@ namespace Intern.Controllers
 
         // POST: api/Notifications
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
+        [Authorize(Roles = "Admin,Employee")]
         [HttpPost]
         public async Task<ActionResult<NotificationDto>> PostNotification([FromBody] NotificationDto notificationDto)
         {
@@ -110,6 +115,7 @@ namespace Intern.Controllers
 
 
         // DELETE: api/Notifications/5
+        [Authorize(Roles = "Admin,Employee")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteNotification(int id)
         {

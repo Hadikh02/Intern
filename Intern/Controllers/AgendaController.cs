@@ -1,13 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using AutoMapper;
+using Intern.DTOs;
+using Intern.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Intern.Models;
-using Intern.DTOs;
-using AutoMapper;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace Intern.Controllers
 {
@@ -25,6 +26,7 @@ namespace Intern.Controllers
         }
 
         // GET: api/Agenda
+        [Authorize(Roles = "Admin,Employee")]
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Agenda>>> GetAgenda()
         {
@@ -32,6 +34,7 @@ namespace Intern.Controllers
         }
 
         // GET: api/Agenda/5
+        [Authorize(Roles = "Admin,Employee")]
         [HttpGet("{id}")]
         public async Task<ActionResult<Agenda>> GetAgenda(int id)
         {
@@ -47,6 +50,7 @@ namespace Intern.Controllers
 
         // PUT: api/Agenda/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
+        [Authorize(Roles = "Admin,Employee")]
         [HttpPut("{id}")]
         public async Task<IActionResult> PutAgenda(int id, Agenda agenda)
         {
@@ -78,6 +82,7 @@ namespace Intern.Controllers
 
         // POST: api/Agenda
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
+        [Authorize(Roles = "Admin,Employee")]
         [HttpPost]
         public async Task<ActionResult<Agenda>> PostAgenda([FromBody] AgendaDto agendaDto)
         {
@@ -112,6 +117,7 @@ namespace Intern.Controllers
         }
 
         // DELETE: api/Agenda/5
+        [Authorize(Roles = "Admin,Employee")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteAgenda(int id)
         {

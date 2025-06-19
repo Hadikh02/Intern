@@ -1,10 +1,12 @@
 ﻿using AutoMapper;
 using Intern.DTOs;
 using Intern.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace Intern.Controllers
@@ -23,6 +25,7 @@ namespace Intern.Controllers
         }
 
         // GET: api/Room
+        [Authorize(Roles = "Admin,Employee")]
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Room>>> GetRooms()
         {
@@ -30,6 +33,7 @@ namespace Intern.Controllers
         }
 
         // GET: api/Room/5
+        [Authorize(Roles = "Admin,Employee")]
         [HttpGet("{id}")]
         public async Task<ActionResult<Room>> GetRoom(int id)
         {
@@ -42,37 +46,48 @@ namespace Intern.Controllers
 
             return room;
         }
-
+        [Authorize(Roles = "Admin")]
         [HttpPut("{id}")]
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        public async Task<IActionResult> PutRoom(int id, Room room)
+        public async Task<IActionResult> PutRoom(int id, [FromBody] RoomDto roomDto)
         {
-            if (id != room.Id)
-            {
-                return BadRequest();
-            }
-            if (string.IsNullOrEmpty(room.RoomNumber))
-            {
+            if (id != roomDto.Id)
+                return BadRequest("Room ID mismatch.");
+
+            var room = await _context.Rooms.FindAsync(id);
+            if (room == null)
+                return NotFound();
+
+            if (string.IsNullOrEmpty(roomDto.RoomNumber))
                 return BadRequest("Room number is required");
-            }
-            var roomNumberExists = await _context.Rooms
-                .AnyAsync(r => r.RoomNumber == room.RoomNumber && r.Id != id);
+
+            bool isValidRoomNumber = Regex.IsMatch(roomDto.RoomNumber, @"^[A-Z]{1}\d+$");
+            if (!isValidRoomNumber)
+                return BadRequest("Invalid room number format. It should start with an uppercase letter followed by digits, like 'A102'.");
+
+            var roomNumberExists = await _context.Rooms.AnyAsync(r => r.RoomNumber == roomDto.RoomNumber && r.Id != id);
             if (roomNumberExists)
-            {
-                return BadRequest($"The room number {room.RoomNumber} already exists");
-            }
-            if (string.IsNullOrEmpty(room.Location))
-            {
+                return BadRequest($"The room number {roomDto.RoomNumber} already exists");
+
+            if (string.IsNullOrEmpty(roomDto.Location))
                 return BadRequest("Room location is required");
-            }
-            if (string.IsNullOrEmpty(room.Status))
-            {
+
+            if (!Regex.IsMatch(roomDto.Location, @"^\d+[A-Za-z]*\s[A-Za-z]+$"))
+                return BadRequest("Location must start with a number followed by a space and letters (e.g., '1st Floor').");
+
+            if (string.IsNullOrEmpty(roomDto.Status))
                 return BadRequest("Room status is required");
-            }
-            if (room.Capacity <= 0)
-            {
-                return BadRequest("Room capacity is required and must be greater than 0");
-            }
+
+            if (!Regex.IsMatch(roomDto.Status, @"^[A-Z][a-z]+$"))
+                return BadRequest("Status must start with a capital letter and contain only lowercase letters afterward (e.g., 'Available').");
+
+            if (roomDto.Capacity <= 0)
+                return BadRequest("Room capacity must be greater than 0");
+
+            room.RoomNumber = roomDto.RoomNumber;
+            room.Location = roomDto.Location;
+            room.Status = roomDto.Status;
+            room.Capacity = roomDto.Capacity;
 
             _context.Entry(room).State = EntityState.Modified;
 
@@ -83,36 +98,51 @@ namespace Intern.Controllers
             catch (DbUpdateConcurrencyException)
             {
                 if (!RoomExists(id))
-                {
                     return NotFound();
-                }
                 else
-                {
                     throw;
-                }
             }
 
             return NoContent();
         }
 
-
         // POST: api/Room
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
+        [Authorize(Roles = "Admin")]
         [HttpPost]
         public async Task<ActionResult<RoomDto>> PostRoom([FromBody] RoomDto roomDto)
         {
-            if (string.IsNullOrEmpty(roomDto.RoomNumber))
+            if (string.IsNullOrWhiteSpace(roomDto.RoomNumber))
                 return BadRequest("Room number is required");
+
+            bool isValidRoomNumber = Regex.IsMatch(roomDto.RoomNumber, @"^[A-Z]{1}\d+$");
+
+            if (isValidRoomNumber == false)
+            {
+                return BadRequest("Invalid room number format. It should start with an uppercase letter followed by digits, like 'A102'.");
+            }
+
 
             var roomExists = await _context.Rooms.AnyAsync(r => r.RoomNumber == roomDto.RoomNumber);
             if (roomExists)
                 return BadRequest($"The room number {roomDto.RoomNumber} already exists");
 
-            if (string.IsNullOrEmpty(roomDto.Location))
+            if (string.IsNullOrWhiteSpace(roomDto.Location))
                 return BadRequest("Room location is required");
 
-            if (string.IsNullOrEmpty(roomDto.Status))
+            if (!Regex.IsMatch(roomDto.Location, @"^\d+[A-Za-z]*\s[A-Za-z]+$"))
+            {
+                return BadRequest("Location must start with a number followed by a space and letters (e.g., '1st Floor').");
+            }
+
+
+            if (string.IsNullOrWhiteSpace(roomDto.Status))
                 return BadRequest("Room status is required");
+
+            if (!Regex.IsMatch(roomDto.Status, @"^[A-Z][a-z]+$"))
+            {
+                return BadRequest("Status must start with a capital letter and contain only lowercase letters afterward (e.g., 'Available').");
+            }
 
             if (roomDto.Capacity <= 0)
                 return BadRequest("Room capacity must be greater than 0");
@@ -128,6 +158,7 @@ namespace Intern.Controllers
 
 
         // DELETE: api/Room/5
+        [Authorize(Roles = "Admin")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteRoom(int id)
         {
