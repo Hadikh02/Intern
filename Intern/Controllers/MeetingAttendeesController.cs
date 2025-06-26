@@ -1,4 +1,6 @@
-﻿using Intern.Models;
+﻿using AutoMapper;
+using Intern.DTOs;
+using Intern.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -15,10 +17,12 @@ namespace Intern.Controllers
     public class MeetingAttendeesController : ControllerBase
     {
         private readonly InternContext _context;
+        private readonly IMapper _mapper;
 
-        public MeetingAttendeesController(InternContext context)
+        public MeetingAttendeesController(InternContext context, IMapper mapper)
         {
             _context = context;
+            _mapper = mapper;
         }
 
         // GET: api/MeetingAttendees
@@ -77,13 +81,13 @@ namespace Intern.Controllers
         }
         [Authorize(Roles = "Admin,Employee")]
         [HttpPost]
-        public async Task<ActionResult<MeetingAttendee>> PostMeetingAttendee([FromBody] MeetingAttendee meetingAttendee)
+        public async Task<ActionResult<MeetingAttendeeDto>> PostMeetingAttendee([FromBody] MeetingAttendeeDto createDto)
         {
             // 1. Basic validation
-            if (meetingAttendee.UserId <= 0)
+            if (createDto.UserId <= 0)
                 return BadRequest("User Id is required and must be greater than 0");
 
-            if (meetingAttendee.MeetingId <= 0)
+            if (createDto.MeetingId <= 0)
                 return BadRequest("Meeting Id is required and must be greater than 0");
 
             // 2. Check current time against meeting time
@@ -91,11 +95,10 @@ namespace Intern.Controllers
 
             // 3. Get meeting with time range
             var meeting = await _context.Meetings
-                .Include(m => m.User) // Organizer info
-                .FirstOrDefaultAsync(m => m.Id == meetingAttendee.MeetingId);
+                .FirstOrDefaultAsync(m => m.Id == createDto.MeetingId);
 
             if (meeting == null)
-                return BadRequest($"Meeting {meetingAttendee.MeetingId} not found");
+                return BadRequest($"Meeting {createDto.MeetingId} not found");
 
             // 4. Time validation
             if (currentTime < meeting.StartTime)
@@ -105,39 +108,32 @@ namespace Intern.Controllers
                 return BadRequest($"Meeting already ended (ended at {meeting.EndTime})");
 
             // 5. Check user exists
-            var user = await _context.Users.FindAsync(meetingAttendee.UserId);
-            if (user == null)
-                return BadRequest($"User Id {meetingAttendee.UserId} not found");
+            var userExists = await _context.Users.AnyAsync(u => u.Id == createDto.UserId);
+            if (!userExists)
+                return BadRequest($"User Id {createDto.UserId} not found");
 
-            // 6. Check if organizer is adding attendees
-            var isOrganizerAdding = meeting.UserId == meetingAttendee.UserId;
-
-            // 7. Check existing attendance
+            // 6. Check existing attendance
             if (await _context.MeetingAttendees
-                .AnyAsync(a => a.MeetingId == meetingAttendee.MeetingId
-                            && a.UserId == meetingAttendee.UserId))
+                .AnyAsync(a => a.MeetingId == createDto.MeetingId
+                            && a.UserId == createDto.UserId))
             {
                 return Conflict("User already attending");
             }
 
+            // 7. Map DTO to entity
+            var meetingAttendee = _mapper.Map<MeetingAttendee>(createDto);
 
-            // 9. Add and save
+            // 8. Add and save
             _context.MeetingAttendees.Add(meetingAttendee);
             await _context.SaveChangesAsync();
 
-            // 10. Return response
-            return CreatedAtAction(nameof(GetMeetingAttendee), new { id = meetingAttendee.Id }, new
-            {
-                meetingAttendee.Id,
-                User = new { user.Id, user.FirstName, user.LastName },
-                Meeting = new { meeting.Id, meeting.Title, meeting.StartTime, meeting.EndTime },
-                meetingAttendee.Role,
-                meetingAttendee.AttendanceStatus,
-                IsOrganizer = isOrganizerAdding
-            });
+            // 9. Map entity to DTO for response
+            var resultDto = _mapper.Map<MeetingAttendeeDto>(meetingAttendee);
+
+            return CreatedAtAction(nameof(GetMeetingAttendee), new { id = meetingAttendee.Id }, resultDto);
         }
         // DELETE: api/MeetingAttendees/5
-          [Authorize(Roles = "Admin,Employee")]
+        [Authorize(Roles = "Admin,Employee")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteMeetingAttendee(int id)
         {

@@ -1,3 +1,5 @@
+using Intern.Models;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Intern.Controllers
@@ -28,6 +30,12 @@ namespace Intern.Controllers
                 Summary = Summaries[Random.Shared.Next(Summaries.Length)]
             })
             .ToArray();
+        }
+        [HttpGet("generate-password")]
+        public IActionResult GeneratePassword()
+        {
+            var hashed = new PasswordHasher<User>().HashPassword(new User(), "hadiHK*022");
+            return Ok(hashed);
         }
     }
 }

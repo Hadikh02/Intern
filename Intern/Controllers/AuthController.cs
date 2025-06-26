@@ -29,13 +29,13 @@ namespace Intern.Controllers
         {
             // Existing validation checks for FirstName, LastName...
             if (string.IsNullOrWhiteSpace(userDto.FirstName) || userDto.FirstName.Trim().ToLower() == "string")
-                return BadRequest("User first name is required");
+                return BadRequest("First name is required");
             if (!Regex.IsMatch(userDto.FirstName, "^[A-Z][a-z]+$"))
                 return BadRequest("First name must start with a capital letter followed by lowercase letters only (e.g., 'John').");
 
 
             if (string.IsNullOrWhiteSpace(userDto.LastName) || userDto.LastName.Trim().ToLower() == "string")
-                return BadRequest("User last name is required");
+                return BadRequest("Last name is required");
             if(!Regex.IsMatch(userDto.LastName, "^[A-Z][a-z]+$"))
                 return BadRequest("Last name must start with a capital letter followed by lowercase letters only (e.g., 'John').");
 
@@ -83,7 +83,7 @@ namespace Intern.Controllers
 
             var newUser = await _authService.RegisterAsync(userDto);
             if (newUser == null)
-                return BadRequest("Email already exists.");
+                return BadRequest("Choose another email.");
 
             var resultDto = _mapper.Map<UserDto>(newUser);
             return CreatedAtAction(nameof(GetUser), new { id = newUser.Id }, resultDto);
