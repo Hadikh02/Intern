@@ -4,6 +4,7 @@ using Intern.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Intern.Migrations
 {
     [DbContext(typeof(InternContext))]
-    partial class InternContextModelSnapshot : ModelSnapshot
+    [Migration("20250703092811_RemoveRoomStatus")]
+    partial class RemoveRoomStatus
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -133,15 +136,6 @@ namespace Intern.Migrations
                         .IsUnicode(false)
                         .HasColumnType("varchar(20)")
                         .HasDefaultValue("Pending");
-
-                    b.Property<bool>("HasAudio")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("HasVideo")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsHandRaised")
-                        .HasColumnType("bit");
 
                     b.Property<int>("MeetingId")
                         .HasColumnType("int");

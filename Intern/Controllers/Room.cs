@@ -86,7 +86,6 @@ namespace Intern.Controllers
 
             room.RoomNumber = roomDto.RoomNumber;
             room.Location = roomDto.Location;
-            room.Status = roomDto.Status;
             room.Capacity = roomDto.Capacity;
 
             _context.Entry(room).State = EntityState.Modified;

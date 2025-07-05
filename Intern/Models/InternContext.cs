@@ -1,7 +1,7 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace Intern.Models;
 
@@ -17,17 +17,11 @@ public partial class InternContext : DbContext
     }
 
     public virtual DbSet<Agenda> Agenda { get; set; }
-
     public virtual DbSet<Meeting> Meetings { get; set; }
-
     public virtual DbSet<MeetingAttendee> MeetingAttendees { get; set; }
-
     public virtual DbSet<Minute> Minutes { get; set; }
-
     public virtual DbSet<Notification> Notifications { get; set; }
-
     public virtual DbSet<Room> Rooms { get; set; }
-
     public virtual DbSet<User> Users { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
@@ -35,6 +29,12 @@ public partial class InternContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        // TimeOnly to TimeSpan converter
+        var timeOnlyConverter = new ValueConverter<TimeOnly, TimeSpan>(
+            t => t.ToTimeSpan(),
+            t => TimeOnly.FromTimeSpan(t)
+        );
+
         modelBuilder.Entity<Agenda>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PK__Agenda__3214EC0700586F3E");
@@ -64,11 +64,18 @@ public partial class InternContext : DbContext
 
             entity.ToTable("Meeting");
 
-            entity.Property(e => e.EndTime).HasColumnType("datetime");
+            entity.Property(e => e.StartTime)
+                .HasConversion(timeOnlyConverter)
+                .HasColumnType("time");
+
+            entity.Property(e => e.EndTime)
+                .HasConversion(timeOnlyConverter)
+                .HasColumnType("time");
+
             entity.Property(e => e.RecordingPath)
                 .HasMaxLength(255)
                 .IsUnicode(false);
-            entity.Property(e => e.StartTime).HasColumnType("datetime");
+
             entity.Property(e => e.Title)
                 .HasMaxLength(100)
                 .IsUnicode(false);
@@ -94,6 +101,7 @@ public partial class InternContext : DbContext
                 .HasMaxLength(20)
                 .IsUnicode(false)
                 .HasDefaultValue("Pending");
+
             entity.Property(e => e.Role)
                 .HasMaxLength(50)
                 .IsUnicode(false);
@@ -162,9 +170,6 @@ public partial class InternContext : DbContext
                 .IsUnicode(false);
             entity.Property(e => e.RoomNumber)
                 .HasMaxLength(10)
-                .IsUnicode(false);
-            entity.Property(e => e.Status)
-                .HasMaxLength(50)
                 .IsUnicode(false);
 
             entity.HasOne(d => d.User).WithMany(p => p.Rooms)

@@ -47,19 +47,173 @@ namespace Intern.Controllers
 
             return meetingAttendee;
         }
-
-        // PUT: api/MeetingAttendees/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [Authorize(Roles = "Admin,Employee")]
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutMeetingAttendee(int id, MeetingAttendee meetingAttendee)
+        [HttpGet("joined")]
+        public async Task<ActionResult<IEnumerable<MeetingAttendee>>> GetJoinedAttendees(int meetingId)
         {
-            if (id != meetingAttendee.Id)
+            // Get the latest status for each user
+            var latestAttendees = _context.MeetingAttendees
+                .Include(a => a.User)
+                .Where(a => a.MeetingId == meetingId)
+                .GroupBy(a => a.UserId)
+                .Select(g => g.OrderByDescending(a => a.Id).First()) // Get the most recent record per user
+                .Where(a => a.AttendanceStatus == "Present" || a.AttendanceStatus == "Joined") // Only active attendees
+                .Select(a => new {
+                    a.Id,
+                    a.MeetingId,
+                    a.UserId,
+                    a.User.FirstName,
+                    a.User.LastName,
+                    a.AttendanceStatus
+                })
+                .ToList();
+
+            return Ok(latestAttendees);
+        }
+        [HttpPut("update-status")]
+        public async Task<IActionResult> UpdateAttendeeStatus([FromBody] UpdateAttendeeStatusDto dto)
+        {
+            var attendee = await _context.MeetingAttendees
+                .Where(a => a.MeetingId == dto.MeetingId && a.UserId == dto.UserId)
+                .OrderByDescending(a => a.Id)
+                .FirstOrDefaultAsync();
+
+            if (attendee == null)
             {
-                return BadRequest();
+                return NotFound("Attendee not found");
             }
 
-            _context.Entry(meetingAttendee).State = EntityState.Modified;
+            attendee.HasAudio = dto.HasAudio;
+            attendee.HasVideo = dto.HasVideo;
+            attendee.IsHandRaised = dto.IsHandRaised;
+
+            _context.MeetingAttendees.Update(attendee);
+            await _context.SaveChangesAsync();
+
+            return Ok();
+        }
+
+        [HttpPut("leave")]
+        public IActionResult LeaveMeeting([FromBody] LeaveMeetingRequestDto request)
+        {
+            // Get the most recent attendee record for this user and meeting
+            var attendee = _context.MeetingAttendees
+                .Where(a => a.MeetingId == request.MeetingId && a.UserId == request.UserId)
+                .OrderByDescending(a => a.Id)
+                .FirstOrDefault();
+
+            if (attendee == null)
+                return NotFound("Attendee not found.");
+
+            // Check if already left
+            if (attendee.AttendanceStatus == "Left")
+                return Ok("Already left the meeting.");
+
+            // Update status to Left
+            attendee.AttendanceStatus = "Left";
+
+            try
+            {
+                _context.SaveChanges();
+                return Ok("Left meeting successfully.");
+            }
+            catch (Exception ex)
+            {
+                return BadRequest($"Error leaving meeting: {ex.Message}");
+            }
+        }
+
+        // Optional: Add a method to clean up duplicate records
+        [HttpPost("cleanup-duplicates")]
+        public IActionResult CleanupDuplicateAttendees(int meetingId)
+        {
+            var duplicates = _context.MeetingAttendees
+                .Where(a => a.MeetingId == meetingId)
+                .GroupBy(a => a.UserId)
+                .Where(g => g.Count() > 1)
+                .SelectMany(g => g.OrderByDescending(a => a.Id).Skip(1)) // Keep the latest, remove older ones
+                .ToList();
+
+            if (duplicates.Any())
+            {
+                _context.MeetingAttendees.RemoveRange(duplicates);
+                _context.SaveChanges();
+                return Ok($"Removed {duplicates.Count} duplicate records.");
+            }
+
+            return Ok("No duplicates found.");
+        }
+        [HttpPut("join")]
+        public async Task<IActionResult> JoinMeeting([FromBody] JoinMeetingRequestDto request)
+        {
+            if (request == null || request.MeetingId <= 0 || request.UserId <= 0)
+                return BadRequest("Invalid join request.");
+
+            try
+            {
+                // Get the latest record for the user in this meeting
+                var latest = await _context.MeetingAttendees
+                    .Where(a => a.MeetingId == request.MeetingId && a.UserId == request.UserId)
+                    .OrderByDescending(a => a.Id)
+                    .FirstOrDefaultAsync();
+
+                if (latest != null)
+                {
+                    if (latest.AttendanceStatus == "Present" || latest.AttendanceStatus == "Joined")
+                    {
+                        return Ok("User already joined.");
+                    }
+
+                    if (latest.AttendanceStatus == "Left")
+                    {
+                        // Update existing record
+                        latest.AttendanceStatus = "Joined";
+                        latest.HasAudio = request.HasAudio;
+                        latest.HasVideo = request.HasVideo;
+                        latest.IsHandRaised = request.IsHandRaised;
+                        latest.Role = request.Role; // Update role if needed
+
+                        await _context.SaveChangesAsync();
+                        return Ok("User rejoined the meeting.");
+                    }
+                }
+
+                // Create new attendee record
+                var newAttendee = new MeetingAttendee
+                {
+                    MeetingId = request.MeetingId,
+                    UserId = request.UserId,
+                    AttendanceStatus = "Joined",
+                    Role = request.Role,
+                    HasAudio = request.HasAudio,
+                    HasVideo = request.HasVideo,
+                    IsHandRaised = request.IsHandRaised,
+                };
+
+                await _context.MeetingAttendees.AddAsync(newAttendee);
+                await _context.SaveChangesAsync();
+
+                return Ok("User joined the meeting.");
+            }
+            catch (Exception ex)
+            {
+                // Log the error
+                return StatusCode(500, "An error occurred while processing your request.");
+            }
+        }
+
+        [HttpPut("{id}")]
+        public async Task<IActionResult> PutMeetingAttendee(int id, MeetingAttendeeUpdateDto dto)
+        {
+            if (id != dto.Id)
+                return BadRequest();
+
+            var attendee = await _context.MeetingAttendees.FindAsync(id);
+            if (attendee == null)
+                return NotFound();
+
+            attendee.AttendanceStatus = dto.AttendanceStatus;
+            attendee.Role = dto.Role;
+            // Optionally update MeetingId and UserId if needed, but usually not
 
             try
             {
@@ -68,17 +222,15 @@ namespace Intern.Controllers
             catch (DbUpdateConcurrencyException)
             {
                 if (!MeetingAttendeeExists(id))
-                {
                     return NotFound();
-                }
                 else
-                {
                     throw;
-                }
             }
 
             return NoContent();
         }
+
+
         [Authorize(Roles = "Admin,Employee")]
         [HttpPost]
         public async Task<ActionResult<MeetingAttendeeDto>> PostMeetingAttendee([FromBody] MeetingAttendeeDto createDto)
@@ -90,48 +242,43 @@ namespace Intern.Controllers
             if (createDto.MeetingId <= 0)
                 return BadRequest("Meeting Id is required and must be greater than 0");
 
-            // 2. Check current time against meeting time
-            var currentTime = DateTime.UtcNow;
+            var currentTime = TimeOnly.FromDateTime(DateTime.UtcNow);
 
-            // 3. Get meeting with time range
+            // 3. Fetch meeting details
             var meeting = await _context.Meetings
                 .FirstOrDefaultAsync(m => m.Id == createDto.MeetingId);
 
             if (meeting == null)
                 return BadRequest($"Meeting {createDto.MeetingId} not found");
 
-            // 4. Time validation
-            if (currentTime < meeting.StartTime)
-                return BadRequest($"Meeting hasn't started yet (starts at {meeting.StartTime})");
-
+            // 4. Block adding attendee after meeting ends
             if (currentTime > meeting.EndTime)
-                return BadRequest($"Meeting already ended (ended at {meeting.EndTime})");
+                return BadRequest($"Cannot add attendees. Meeting already ended at {meeting.EndTime}.");
 
-            // 5. Check user exists
+            // 5. Check if user exists
             var userExists = await _context.Users.AnyAsync(u => u.Id == createDto.UserId);
             if (!userExists)
                 return BadRequest($"User Id {createDto.UserId} not found");
 
-            // 6. Check existing attendance
-            if (await _context.MeetingAttendees
-                .AnyAsync(a => a.MeetingId == createDto.MeetingId
-                            && a.UserId == createDto.UserId))
-            {
-                return Conflict("User already attending");
-            }
+            // 6. Prevent duplicate attendee
+            bool alreadyAttending = await _context.MeetingAttendees
+                .AnyAsync(a => a.MeetingId == createDto.MeetingId && a.UserId == createDto.UserId);
+            if (alreadyAttending)
+                return Conflict("User is already an attendee for this meeting.");
 
             // 7. Map DTO to entity
             var meetingAttendee = _mapper.Map<MeetingAttendee>(createDto);
 
-            // 8. Add and save
+            // 8. Add and save to DB
             _context.MeetingAttendees.Add(meetingAttendee);
             await _context.SaveChangesAsync();
 
-            // 9. Map entity to DTO for response
+            // 9. Map saved entity to response DTO
             var resultDto = _mapper.Map<MeetingAttendeeDto>(meetingAttendee);
 
             return CreatedAtAction(nameof(GetMeetingAttendee), new { id = meetingAttendee.Id }, resultDto);
         }
+
         // DELETE: api/MeetingAttendees/5
         [Authorize(Roles = "Admin,Employee")]
         [HttpDelete("{id}")]

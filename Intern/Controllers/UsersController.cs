@@ -51,79 +51,54 @@ namespace Intern.Controllers
 
             return user;
         }
+        [HttpGet("me")]
+        [Authorize]
+        public async Task<ActionResult<User>> GetCurrentUser()
+        {
+            var userEmail = User.Identity?.Name;
 
+            if (string.IsNullOrEmpty(userEmail))
+                return NotFound("User email not found in token.");
+
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == userEmail);
+
+            if (user == null)
+                return NotFound("User not found.");
+
+            return Ok(user);
+        }
         // PUT: api/Users/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutUser(int id, User user)
+        public async Task<IActionResult> PutUser(int id, UpdateUserDto userDto)
         {
-            if (id != user.Id)
-            {
-                return BadRequest();
-            }
+            var existingUser = await _context.Users.FindAsync(id);
+            if (existingUser == null) return NotFound();
 
-            if (string.IsNullOrWhiteSpace(user.FirstName))
-            {
-                return BadRequest("First name is required");
-            }
-            if (!Regex.IsMatch(user.FirstName, "^[A-Z][a-z]+$"))
-            {
-                return BadRequest("First name must start with a capital letter followed by lowercase letters only (e.g., 'John').");
-            }
+            // Validations (same as before)
+            if (string.IsNullOrWhiteSpace(userDto.FirstName) || !Regex.IsMatch(userDto.FirstName, "^[A-Z][a-z]+$"))
+                return BadRequest("First name is invalid.");
 
-            if (string.IsNullOrWhiteSpace(user.LastName))
-            {
-                return BadRequest("Last name is required");
-            }
-            if (!Regex.IsMatch(user.LastName, "^[A-Z][a-z]+$"))
-            {
-                return BadRequest("Last name must start with a capital letter followed by lowercase letters only (e.g., 'Doe').");
-            }
+            if (string.IsNullOrWhiteSpace(userDto.LastName) || !Regex.IsMatch(userDto.LastName, "^[A-Z][a-z]+$"))
+                return BadRequest("Last name is invalid.");
 
-            var checkEmail = await _context.Users.AnyAsync(u => u.Email == user.Email && u.Id != id);
-            if (checkEmail)
-            {
+            var email = userDto.Email.Trim();
+            if (await _context.Users.AnyAsync(u => u.Email == email && u.Id != id))
                 return BadRequest("Please choose another email address");
-            }
 
-            var email = user.Email.Trim();
             var emailValidationResult = ValidateEmail(email);
             if (!emailValidationResult.IsValid)
-            {
                 return BadRequest(emailValidationResult.ErrorMessage);
-            }
 
-            // Load the existing user
-            var existingUser = await _context.Users.FindAsync(id);
-            if (existingUser == null)
-            {
-                return NotFound();
-            }
-
-            // Update only allowed fields
-            existingUser.FirstName = user.FirstName;
-            existingUser.LastName = user.LastName;
+            // Update allowed fields only
+            existingUser.FirstName = userDto.FirstName;
+            existingUser.LastName = userDto.LastName;
             existingUser.Email = email;
-            // Password is not updated here
 
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!UserExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
+            await _context.SaveChangesAsync();
             return NoContent();
         }
+
 
         // DELETE: api/Users/5
         [HttpDelete("{id}")]

@@ -43,6 +43,19 @@ namespace Intern.Controllers
 
             return meeting;
         }
+        [HttpGet("Room/{roomId}")]
+        public async Task<IActionResult> GetMeetingsByRoomAndDate(int roomId, [FromQuery] DateOnly date)
+        {
+            var meetings = await _context.Meetings
+                .Where(m => m.RoomId == roomId && m.MeetingDate == date)
+                .Select(m => new {
+                    m.StartTime,
+                    m.EndTime
+                })
+                .ToListAsync();
+
+            return Ok(meetings);
+        }
 
         // PUT: api/Meetings/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
@@ -107,9 +120,6 @@ namespace Intern.Controllers
             if (room == null)
                 return BadRequest($"Room with ID {meetingDto.RoomId} not found");
 
-            if (room.Status != "Available")
-                return Conflict($"Room {room.RoomNumber} is currently {room.Status}");
-
             var timeConflict = room.Meetings.Any(m =>
                 m.MeetingDate == meetingDto.MeetingDate &&
                 m.StartTime < meetingDto.EndTime &&
@@ -118,7 +128,6 @@ namespace Intern.Controllers
             if (timeConflict)
                 return Conflict("Room is already booked during the requested time");
 
-            room.Status = "Not Available";
             _context.Rooms.Update(room);
 
             var meeting = _mapper.Map<Meeting>(meetingDto);

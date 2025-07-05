@@ -14,6 +14,9 @@ public partial class MeetingAttendee
     public string? AttendanceStatus { get; set; }
 
     public string Role { get; set; } = null!;
+    public bool HasAudio { get; set; } = false;
+    public bool HasVideo { get; set; } = false;
+    public bool IsHandRaised { get; set; } = false;
 
     public virtual Meeting Meeting { get; set; } = null!;
 

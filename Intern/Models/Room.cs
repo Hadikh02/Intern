@@ -11,8 +11,6 @@ public partial class Room
 
     public string Location { get; set; } = null!;
 
-    public string? Status { get; set; }
-
     public bool HasVideo { get; set; }
 
     public bool HasProjector { get; set; }
