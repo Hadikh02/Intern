@@ -89,10 +89,6 @@ namespace Intern.Controllers
                 return NotFound("Attendee not found");
             }
 
-            attendee.HasAudio = dto.HasAudio;
-            attendee.HasVideo = dto.HasVideo;
-            attendee.IsHandRaised = dto.IsHandRaised;
-
             _context.MeetingAttendees.Update(attendee);
             await _context.SaveChangesAsync();
 
@@ -174,9 +170,6 @@ namespace Intern.Controllers
                     {
                         // Update existing record
                         latest.AttendanceStatus = "Joined";
-                        latest.HasAudio = request.HasAudio;
-                        latest.HasVideo = request.HasVideo;
-                        latest.IsHandRaised = request.IsHandRaised;
                         latest.Role = request.Role; // Update role if needed
 
                         await _context.SaveChangesAsync();
@@ -191,9 +184,6 @@ namespace Intern.Controllers
                     UserId = request.UserId,
                     AttendanceStatus = "Joined",
                     Role = request.Role,
-                    HasAudio = request.HasAudio,
-                    HasVideo = request.HasVideo,
-                    IsHandRaised = request.IsHandRaised,
                 };
 
                 await _context.MeetingAttendees.AddAsync(newAttendee);
