@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading.Tasks;
 
 namespace Intern.Controllers
@@ -47,7 +48,52 @@ namespace Intern.Controllers
 
             return notification;
         }
+        // GET: api/Notifications/user/5
+        [Authorize(Roles = "Admin,Employee")]
+        [HttpGet("user/{userId}")]
+        public async Task<ActionResult<IEnumerable<Notification>>> GetNotificationsByUser(int userId)
+        {
+            return await _context.Notifications
+                .Where(n => n.UserId == userId)
+                .OrderByDescending(n => n.CreatedAt)
+                .ToListAsync();
+        }
 
+        [Authorize] // Still keep authorization to ensure valid users
+        [HttpPut("mark-as-read/{id}")]
+        public async Task<IActionResult> MarkNotificationAsRead(int id)
+        {
+            try
+            {
+                // Find the notification by ID only
+                var notification = await _context.Notifications.FindAsync(id);
+                if (notification == null)
+                {
+                    return NotFound(new
+                    {
+                        Message = $"Notification with ID {id} not found",
+                        Status = 404
+                    });
+                }
+
+                // Update the notification without user verification
+                notification.IsRead = true;
+
+                _context.Notifications.Update(notification);
+                await _context.SaveChangesAsync();
+
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    Message = "An error occurred while updating the notification",
+                    Error = ex.Message,
+                    Status = 500
+                });
+            }
+        }
         // PUT: api/Notifications/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [Authorize(Roles = "Admin,Employee")]
@@ -94,10 +140,18 @@ namespace Intern.Controllers
 
             if (notificationDto.MeetingId <= 0)
                 return BadRequest("MeetingId is required and must be greater than 0.");
+            if(notificationDto.UserID <=0)
+                return BadRequest("UserId is required and must be greater than 0.");
+
 
             var meeting = await _context.Meetings.FindAsync(notificationDto.MeetingId);
             if (meeting == null)
                 return BadRequest($"Meeting with Id {notificationDto.MeetingId} not found.");
+
+            var user = await _context.Users.FindAsync(notificationDto.UserID);
+            if (user == null)
+                return BadRequest($"User with Id {notificationDto.UserID} not found.");
+
 
             var notification = _mapper.Map<Notification>(notificationDto);
 

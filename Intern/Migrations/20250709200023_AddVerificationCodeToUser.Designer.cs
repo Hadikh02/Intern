@@ -4,6 +4,7 @@ using Intern.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Intern.Migrations
 {
     [DbContext(typeof(InternContext))]
-    partial class InternContextModelSnapshot : ModelSnapshot
+    [Migration("20250709200023_AddVerificationCodeToUser")]
+    partial class AddVerificationCodeToUser
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -82,7 +85,19 @@ namespace Intern.Migrations
                     b.Property<TimeSpan>("EndTime")
                         .HasColumnType("time");
 
+                    b.Property<bool>("IsRecorded")
+                        .HasColumnType("bit");
+
                     b.Property<DateOnly>("MeetingDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("RecordingPath")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<DateOnly>("RecordingUploadedAt")
                         .HasColumnType("date");
 
                     b.Property<int>("RoomId")
@@ -318,6 +333,7 @@ namespace Intern.Migrations
                         .HasColumnType("varchar(20)");
 
                     b.Property<string>("VerificationCode")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("VerificationCodeExpiry")

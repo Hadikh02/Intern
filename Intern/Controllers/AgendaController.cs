@@ -52,14 +52,22 @@ namespace Intern.Controllers
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [Authorize(Roles = "Admin,Employee")]
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutAgenda(int id, Agenda agenda)
+        public async Task<IActionResult> PutAgenda(int id, [FromBody] AgendaDto agendaDto)
         {
-            if (id != agenda.Id)
-            {
-                return BadRequest();
-            }
+            if (id != agendaDto.Id)
+                return BadRequest("ID mismatch");
 
-            _context.Entry(agenda).State = EntityState.Modified;
+            var existingAgenda = await _context.Agenda.FindAsync(id);
+            if (existingAgenda == null)
+                return NotFound();
+
+            // Preserve CreatedAt
+            var createdAt = existingAgenda.CreatedAt;
+
+            // Update the agenda fields using AutoMapper
+            _mapper.Map(agendaDto, existingAgenda);
+
+            existingAgenda.CreatedAt = createdAt; // 🔐 ensure CreatedAt doesn't change
 
             try
             {
@@ -68,23 +76,20 @@ namespace Intern.Controllers
             catch (DbUpdateConcurrencyException)
             {
                 if (!AgendaExists(id))
-                {
                     return NotFound();
-                }
                 else
-                {
                     throw;
-                }
             }
 
             return NoContent();
         }
 
+
         // POST: api/Agenda
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [Authorize(Roles = "Admin,Employee")]
         [HttpPost]
-        public async Task<ActionResult<Agenda>> PostAgenda([FromBody] AgendaDto agendaDto)
+        public async Task<ActionResult<AgendaDto>> PostAgenda([FromBody] AgendaDto agendaDto)
         {
             if (string.IsNullOrWhiteSpace(agendaDto.Topic))
                 return BadRequest("Topic is required");
@@ -100,21 +105,25 @@ namespace Intern.Controllers
 
             if (agendaDto.MeetingId <= 0)
                 return BadRequest("MeetingId is required and must be greater than 0");
+
             var meetingExists = await _context.Meetings.FindAsync(agendaDto.MeetingId);
             if (meetingExists == null)
                 return BadRequest($"Meeting with Id {agendaDto.MeetingId} not found");
 
+            // Set CreatedAt if not supplied
+            if (agendaDto.CreatedAt == default)
+                agendaDto.CreatedAt = DateTime.UtcNow;
 
             var agenda = _mapper.Map<Agenda>(agendaDto);
 
             _context.Agenda.Add(agenda);
             await _context.SaveChangesAsync();
 
-            // Map back to DTO to return
             var resultDto = _mapper.Map<AgendaDto>(agenda);
 
             return CreatedAtAction("GetAgenda", new { id = agenda.Id }, resultDto);
         }
+
 
         // DELETE: api/Agenda/5
         [Authorize(Roles = "Admin,Employee")]

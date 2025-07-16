@@ -33,6 +33,7 @@ namespace Intern.Controllers
 
         // GET: api/Users
         [HttpGet]
+        [Authorize]
         public async Task<ActionResult<IEnumerable<User>>> GetUsers()
         {
             return await _context.Users.ToListAsync();
@@ -40,6 +41,7 @@ namespace Intern.Controllers
 
         // GET: api/Users/5
         [HttpGet("{id}")]
+        [Authorize]
         public async Task<ActionResult<User>> GetUser(int id)
         {
             var user = await _context.Users.FindAsync(id);
@@ -70,6 +72,7 @@ namespace Intern.Controllers
         // PUT: api/Users/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
+        [Authorize]
         public async Task<IActionResult> PutUser(int id, UpdateUserDto userDto)
         {
             var existingUser = await _context.Users.FindAsync(id);
@@ -77,10 +80,10 @@ namespace Intern.Controllers
 
             // Validations (same as before)
             if (string.IsNullOrWhiteSpace(userDto.FirstName) || !Regex.IsMatch(userDto.FirstName, "^[A-Z][a-z]+$"))
-                return BadRequest("First name is invalid.");
+                return BadRequest("First name must start with a capital letter followed by lowercase letters only (e.g., 'John').");
 
             if (string.IsNullOrWhiteSpace(userDto.LastName) || !Regex.IsMatch(userDto.LastName, "^[A-Z][a-z]+$"))
-                return BadRequest("Last name is invalid.");
+                return BadRequest("Last name must start with a capital letter followed by lowercase letters only (e.g., 'John').");
 
             var email = userDto.Email.Trim();
             if (await _context.Users.AnyAsync(u => u.Email == email && u.Id != id))
@@ -101,6 +104,7 @@ namespace Intern.Controllers
 
 
         // DELETE: api/Users/5
+        [Authorize]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteUser(int id)
         {
@@ -109,13 +113,21 @@ namespace Intern.Controllers
             {
                 return NotFound();
             }
-            var checkMeetRlt = await _context.Meetings.AnyAsync(meet => meet.UserId == user.Id);
-            if(checkMeetRlt)
+
+            // Check if user has meetings they created
+            var hasMeetings = await _context.Meetings.AnyAsync(meet => meet.UserId == user.Id);
+            if (hasMeetings)
             {
-                return BadRequest($"The user id {user.Id} cannot be deleted since it exists in other tables");
+                return BadRequest($"The user id {user.Id} cannot be deleted since they have created meetings");
             }
-           
-           
+
+            // Check if user is an attendee in any meetings
+            var isAttendee = await _context.MeetingAttendees.AnyAsync(ma => ma.UserId == user.Id);
+            if (isAttendee)
+            {
+                return BadRequest($"The user id {user.Id} cannot be deleted since they are an attendee in meetings");
+            }
+
             _context.Users.Remove(user);
             await _context.SaveChangesAsync();
 
@@ -177,6 +189,15 @@ namespace Intern.Controllers
             return validTlds.Contains(tld);
         }
 
+        [HttpGet("has-meetings/{userId}")]
+        [Authorize]
+        public async Task<ActionResult<bool>> UserHasMeetings(int userId)
+        {
+            var hasCreatedMeetings = await _context.Meetings.AnyAsync(m => m.UserId == userId);
+            var isAttendee = await _context.MeetingAttendees.AnyAsync(ma => ma.UserId == userId);
+
+            return Ok(hasCreatedMeetings || isAttendee);
+        }
         private bool UserExists(int id)
         {
             return _context.Users.Any(e => e.Id == id);

@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading.Tasks;
 
 namespace Intern.Controllers
@@ -25,12 +26,18 @@ namespace Intern.Controllers
             _mapper = mapper;
         }
 
-        // GET: api/MeetingAttendees
-        [Authorize(Roles = "Admin,Employee")]
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<MeetingAttendee>>> GetMeetingAttendees()
+        [Authorize]
+        public async Task<ActionResult<IEnumerable<MeetingAttendee>>> GetMeetingAttendees([FromQuery] int? meetingId)
         {
-            return await _context.MeetingAttendees.ToListAsync();
+            var query = _context.MeetingAttendees
+                .Include(a => a.User)
+                .AsQueryable();
+
+            if (meetingId.HasValue)
+                query = query.Where(a => a.MeetingId == meetingId);
+
+            return await query.ToListAsync();
         }
 
         // GET: api/MeetingAttendees/5
@@ -230,7 +237,6 @@ namespace Intern.Controllers
             return NoContent();
         }
 
-
         [Authorize(Roles = "Admin,Employee")]
         [HttpPost]
         public async Task<ActionResult<MeetingAttendeeDto>> PostMeetingAttendee([FromBody] MeetingAttendeeDto createDto)
@@ -300,7 +306,94 @@ namespace Intern.Controllers
 
             return NoContent();
         }
+        [HttpDelete("delete-for-meeting/{meetingId}")]
+        [Authorize]
+        public async Task<IActionResult> DeleteAllAttendeesForMeeting(int meetingId)
+        {
+            try
+            {
+                // Get user ID from claims - using multiple possible claim types
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ??
+                             User.FindFirstValue("uid") ??
+                             User.FindFirstValue("sub");
 
+                if (string.IsNullOrEmpty(userId) || !int.TryParse(userId, out int currentUserId))
+                {
+                    return Unauthorized(new
+                    {
+                        success = false,
+                        message = "Invalid user identification",
+                        error = "USER_ID_MISSING"
+                    });
+                }
+
+                // First verify the meeting exists
+                var meeting = await _context.Meetings
+                    .Include(m => m.Agenda)
+                    .Include(m => m.Minutes)
+                    .Include(m => m.Notifications)
+                    .Include(m => m.MeetingAttendees)
+                    .FirstOrDefaultAsync(m => m.Id == meetingId);
+
+                if (meeting == null)
+                    return NotFound(new
+                    {
+                        success = false,
+                        message = "Meeting not found",
+                        error = "MEETING_NOT_FOUND"
+                    });
+
+                // Check if user is organizer
+                if (meeting.UserId != currentUserId)
+                    return StatusCode(403, new
+                    {
+                        success = false,
+                        message = "Only meeting organizer can delete attendees",
+                        error = "NOT_AUTHORIZED"
+                    });
+
+                // Check if meeting hasn't started yet
+                var meetingDateTime = meeting.MeetingDate.ToDateTime(meeting.StartTime);
+                if (DateTime.Now >= meetingDateTime)
+                    return BadRequest(new
+                    {
+                        success = false,
+                        message = "Cannot delete meeting that has already started",
+                        error = "MEETING_ALREADY_STARTED"
+                    });
+
+                // Delete all related entities
+                if (meeting.Agenda?.Any() == true)
+                    _context.Agenda.RemoveRange(meeting.Agenda);
+
+                if (meeting.Minutes?.Any() == true)
+                    _context.Minutes.RemoveRange(meeting.Minutes);
+
+                if (meeting.Notifications?.Any() == true)
+                    _context.Notifications.RemoveRange(meeting.Notifications);
+
+                if (meeting.MeetingAttendees?.Any() == true)
+                    _context.MeetingAttendees.RemoveRange(meeting.MeetingAttendees);
+
+                await _context.SaveChangesAsync();
+
+                return Ok(new
+                {
+                    success = true,
+                    message = "Meeting deleted successfully"
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "An error occurred while deleting meeting attendees",
+                    error = "SERVER_ERROR",
+                    details = ex.Message
+                });
+            }
+        }
         private bool MeetingAttendeeExists(int id)
         {
             return _context.MeetingAttendees.Any(e => e.Id == id);

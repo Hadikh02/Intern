@@ -19,12 +19,6 @@ public partial class Meeting
 
     public TimeOnly EndTime { get; set; }
 
-    public string RecordingPath { get; set; } = null!;
-
-    public bool IsRecorded { get; set; }
-
-    public DateOnly RecordingUploadedAt { get; set; }
-
     public virtual ICollection<Agenda> Agenda { get; set; } = new List<Agenda>();
 
     public virtual ICollection<MeetingAttendee> MeetingAttendees { get; set; } = new List<MeetingAttendee>();

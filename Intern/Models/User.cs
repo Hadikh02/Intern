@@ -18,6 +18,9 @@ public partial class User
     public string? UserType { get; set; }
     public string? RefreshToken {  get; set; }
     public DateTime? RefreshTokenExpiryTime { get; set; }
+    public string? VerificationCode { get; set; } 
+
+    public DateTime? VerificationCodeExpiry { get; set; }
 
     public virtual ICollection<MeetingAttendee> MeetingAttendees { get; set; } = new List<MeetingAttendee>();
 

@@ -4,6 +4,7 @@ using Intern.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Intern.Migrations
 {
     [DbContext(typeof(InternContext))]
-    partial class InternContextModelSnapshot : ModelSnapshot
+    [Migration("20250709102215_ChangeTimeAllocationType")]
+    partial class ChangeTimeAllocationType
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -29,9 +32,6 @@ namespace Intern.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -82,7 +82,19 @@ namespace Intern.Migrations
                     b.Property<TimeSpan>("EndTime")
                         .HasColumnType("time");
 
+                    b.Property<bool>("IsRecorded")
+                        .HasColumnType("bit");
+
                     b.Property<DateOnly>("MeetingDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("RecordingPath")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<DateOnly>("RecordingUploadedAt")
                         .HasColumnType("date");
 
                     b.Property<int>("RoomId")
@@ -316,12 +328,6 @@ namespace Intern.Migrations
                         .HasMaxLength(20)
                         .IsUnicode(false)
                         .HasColumnType("varchar(20)");
-
-                    b.Property<string>("VerificationCode")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("VerificationCodeExpiry")
-                        .HasColumnType("datetime2");
 
                     b.HasKey("Id")
                         .HasName("PK__User__3214EC07C18C929F");

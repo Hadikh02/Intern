@@ -4,6 +4,7 @@ using Intern.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
@@ -61,24 +62,39 @@ namespace Intern.Controllers
             if (existingMinute == null)
                 return NotFound();
 
-            // Use AutoMapper to map updated fields from DTO to entity
-            _mapper.Map(minuteDto, existingMinute);
+            // Enhanced date validation
+            if (minuteDto.DueDate == default(DateTime))
+                return BadRequest("Due date is required");
 
             try
             {
+                // Ensure date is within SQL Server range
+                if (minuteDto.DueDate < new DateTime(1753, 1, 1) || minuteDto.DueDate > new DateTime(9999, 12, 31))
+                    return BadRequest("Due date must be between 1/1/1753 and 12/31/9999");
+
+                // Map only the fields we want to update
+                existingMinute.AssignAction = minuteDto.AssignAction;
+                existingMinute.DueDate = minuteDto.DueDate;
+                existingMinute.MeetingAttendeeId = minuteDto.MeetingAttendeeId;
+
+                // Explicitly don't update CreatedAt
+                _context.Entry(existingMinute).Property(x => x.CreatedAt).IsModified = false;
+
                 await _context.SaveChangesAsync();
             }
             catch (DbUpdateConcurrencyException)
             {
                 if (!MinuteExists(id))
                     return NotFound();
-                else
-                    throw;
+                throw;
+            }
+            catch (DbUpdateException ex) when (ex.InnerException is SqlException sqlEx && sqlEx.Message.Contains("overflow"))
+            {
+                return BadRequest("Invalid date range. Date must be between 1/1/1753 and 12/31/9999");
             }
 
             return NoContent();
         }
-
 
         // POST: api/Minutes
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
@@ -104,6 +120,23 @@ namespace Intern.Controllers
 
             if (string.IsNullOrWhiteSpace(minuteDto.AssignAction))
                 return BadRequest("AssignAction is required");
+
+            // Add validation for DueDate
+            if (minuteDto.DueDate == default)
+                return BadRequest("Due date is required");
+
+            // Convert to DateTime and validate range
+            DateTime dueDate;
+            try
+            {
+                dueDate = minuteDto.DueDate;
+                if (dueDate < new DateTime(1753, 1, 1) || dueDate > new DateTime(9999, 12, 31))
+                    return BadRequest("Due date must be between 1/1/1753 and 12/31/9999");
+            }
+            catch
+            {
+                return BadRequest("Invalid due date format");
+            }
 
             if (minuteDto.CreatedAt == default)
                 minuteDto.CreatedAt = DateTime.UtcNow;

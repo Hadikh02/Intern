@@ -26,6 +26,13 @@ builder.Services.AddDbContext<InternContext>(options =>
 // Add AutoMapper and Services
 builder.Services.AddAutoMapper(typeof(MappingProfile));
 builder.Services.AddScoped<IAuthService, AuthService>();
+// Add this to your Program.cs file
+
+// Register the email service
+builder.Services.AddScoped<IEmailService, EmailService>();
+
+// If you need to configure email settings explicitly
+builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
 
 // Add Authentication
 builder.Services.AddAuthentication(options =>

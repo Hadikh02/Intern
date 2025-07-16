@@ -15,9 +15,10 @@ public partial class Agenda
 
     public string ItemNumber { get; set; } = null!;
 
-    public TimeOnly TimeAllocation { get; set; }
+    public int TimeAllocation { get; set; }
 
     public int MeetingId { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public virtual Meeting Meeting { get; set; } = null!;
 }

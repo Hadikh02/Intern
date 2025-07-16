@@ -4,7 +4,9 @@ using Intern.Models;
 using Intern.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using System.Net.Mail;
 using System.Text.RegularExpressions;
 
@@ -17,11 +19,13 @@ namespace Intern.Controllers
         private readonly InternContext _context;
         private readonly IMapper _mapper;
         private readonly IAuthService _authService;
-        public AuthController(IAuthService authService, InternContext context, IMapper mapper)
+        private readonly IEmailService _emailService;
+        public AuthController(IAuthService authService, InternContext context, IMapper mapper, IEmailService emailService)
         {
             _authService = authService;
             _context = context;
             _mapper = mapper;
+            _emailService = emailService;
         }
         [Authorize(Roles = "Admin")]
         [HttpPost("register-auth")]
@@ -197,5 +201,85 @@ namespace Intern.Controllers
         {
             return Ok("you are an admin");
         }
+
+        [AllowAnonymous]
+        [HttpPost("send-reset-code")]
+        public async Task<IActionResult> SendResetCode([FromBody] ResetEmailDto request)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
+            if (user == null)
+                return NotFound(new { message = "This email is not registered." });
+
+            // Generate 6-character code
+            string code = new Random().Next(100000, 999999).ToString();
+
+            // Store code temporarily in DB or cache (simplified here)
+            user.VerificationCode = code;
+            user.VerificationCodeExpiry = DateTime.UtcNow.AddMinutes(10);
+            await _context.SaveChangesAsync();
+
+            // Send email (setup your SMTP properly)
+            var fullName = $"{user.FirstName} {user.LastName}";
+            var emailResult = await _emailService.SendVerificationCodeAsync(user.Email, fullName, code);
+            if (!emailResult.Success)
+            {
+                return StatusCode(500, new { message = "Failed to send verification email: " + emailResult.ErrorMessage });
+            }
+
+            return Ok(new { message = "Verification code sent." });
+        }
+
+        [HttpPost("verify-code")]
+        public async Task<IActionResult> VerifyCode([FromBody] CodeVerificationDto dto)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
+            if (user == null || user.VerificationCode != dto.Code || user.VerificationCodeExpiry < DateTime.UtcNow)
+                return BadRequest(new { message = "Invalid or expired code." });
+
+            return Ok();
+        }
+
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto dto)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
+            if (user == null)
+                return NotFound(new { message = "User not found" });
+
+            // ✅ Validate password
+            if (string.IsNullOrWhiteSpace(dto.NewPassword) || dto.NewPassword.Trim().ToLower() == "string")
+                return BadRequest("User password is required");
+
+            bool passwordLength = dto.NewPassword.Length >= 8;
+            bool hasUppercase = dto.NewPassword.Any(char.IsUpper);
+            bool hasLowercase = dto.NewPassword.Any(char.IsLower);
+            bool hasDigit = dto.NewPassword.Any(char.IsDigit);
+            bool hasSpecialChar = dto.NewPassword.Any(ch => !char.IsLetterOrDigit(ch));
+
+            if (!hasUppercase)
+                return BadRequest(new { message = "Your password must include at least one uppercase letter (A-Z) to make it stronger." });
+            if (!hasLowercase)
+                return BadRequest(new { message = "Please include at least one lowercase letter (a-z) in your password." });
+            if (!hasDigit)
+                return BadRequest(new { message = "Add at least one number (0-9) to your password for better security." });
+            if (!hasSpecialChar)
+                return BadRequest(new { message = "Your password needs at least one special character (e.g., !, @, #, $) to be secure." });
+            if (!passwordLength)
+                return BadRequest(new { message = "Your password must be at least 8 characters long." });
+
+
+            // ✅ Save new password
+            user.Password = new PasswordHasher<User>().HashPassword(user, dto.NewPassword);
+            user.VerificationCode = null;
+            user.VerificationCodeExpiry = null;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Password reset successfully" });
+        }
+
+
+
+
     }
 }

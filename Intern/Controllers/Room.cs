@@ -46,9 +46,9 @@ namespace Intern.Controllers
 
             return room;
         }
+        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [Authorize(Roles = "Admin")]
         [HttpPut("{id}")]
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         public async Task<IActionResult> PutRoom(int id, [FromBody] RoomDto roomDto)
         {
             if (id != roomDto.Id)
@@ -58,35 +58,75 @@ namespace Intern.Controllers
             if (room == null)
                 return NotFound();
 
+            // Validation
             if (string.IsNullOrEmpty(roomDto.RoomNumber))
-                return BadRequest("Room number is required");
+                return BadRequest(new
+                {
+                    message = "Validation failed",
+                    errors = new
+                    {
+                        RoomNumber = new[] { "Room number is required" }
+                    }
+                });
 
             bool isValidRoomNumber = Regex.IsMatch(roomDto.RoomNumber, @"^[A-Z]{1}\d+$");
             if (!isValidRoomNumber)
-                return BadRequest("Invalid room number format. It should start with an uppercase letter followed by digits, like 'A102'.");
+                return BadRequest(new
+                {
+                    message = "Validation failed",
+                    errors = new
+                    {
+                        RoomNumber = new[] { "Invalid room number format. It should start with an uppercase letter followed by digits, like 'A102'." }
+                    }
+                });
 
             var roomNumberExists = await _context.Rooms.AnyAsync(r => r.RoomNumber == roomDto.RoomNumber && r.Id != id);
             if (roomNumberExists)
-                return BadRequest($"The room number {roomDto.RoomNumber} already exists");
+                return BadRequest(new
+                {
+                    message = "Validation failed",
+                    errors = new
+                    {
+                        RoomNumber = new[] { $"The room number {roomDto.RoomNumber} already exists" }
+                    }
+                });
 
             if (string.IsNullOrEmpty(roomDto.Location))
-                return BadRequest("Room location is required");
+                return BadRequest(new
+                {
+                    message = "Validation failed",
+                    errors = new
+                    {
+                        Location = new[] { "Room location is required" }
+                    }
+                });
 
             if (!Regex.IsMatch(roomDto.Location, @"^\d+[A-Za-z]*\s[A-Za-z]+$"))
-                return BadRequest("Location must start with a number followed by a space and letters (e.g., '1st Floor').");
-
-            if (string.IsNullOrEmpty(roomDto.Status))
-                return BadRequest("Room status is required");
-
-            if (!Regex.IsMatch(roomDto.Status, @"^[A-Z][a-z]+$"))
-                return BadRequest("Status must start with a capital letter and contain only lowercase letters afterward (e.g., 'Available').");
+                return BadRequest(new
+                {
+                    message = "Validation failed",
+                    errors = new
+                    {
+                        Location = new[] { "Location must start with a number followed by a space and letters (e.g., '1st Floor')." }
+                    }
+                });
 
             if (roomDto.Capacity <= 0)
-                return BadRequest("Room capacity must be greater than 0");
+                return BadRequest(new
+                {
+                    message = "Validation failed",
+                    errors = new
+                    {
+                        Capacity = new[] { "Room capacity must be greater than 0" }
+                    }
+                });
 
+            // Update all fields
             room.RoomNumber = roomDto.RoomNumber;
             room.Location = roomDto.Location;
             room.Capacity = roomDto.Capacity;
+            room.HasVideo = roomDto.HasVideo;
+            room.HasProjector = roomDto.HasProjector;
 
             _context.Entry(room).State = EntityState.Modified;
 
@@ -132,15 +172,6 @@ namespace Intern.Controllers
             if (!Regex.IsMatch(roomDto.Location, @"^\d+[A-Za-z]*\s[A-Za-z]+$"))
             {
                 return BadRequest("Location must start with a number followed by a space and letters (e.g., '1st Floor').");
-            }
-
-
-            if (string.IsNullOrWhiteSpace(roomDto.Status))
-                return BadRequest("Room status is required");
-
-            if (!Regex.IsMatch(roomDto.Status, @"^[A-Z][a-z]+$"))
-            {
-                return BadRequest("Status must start with a capital letter and contain only lowercase letters afterward (e.g., 'Available').");
             }
 
             if (roomDto.Capacity <= 0)

@@ -13,5 +13,6 @@
         public DateTime CreatedAt { get; set; }
 
         public int MeetingId { get; set; }
+        public int UserID { get; set; }
     }
 }

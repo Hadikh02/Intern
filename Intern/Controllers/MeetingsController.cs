@@ -1,12 +1,15 @@
 ﻿using AutoMapper;
 using Intern.DTOs;
 using Intern.Models;
+using Intern.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading.Tasks;
 
 namespace Intern.Controllers
@@ -17,10 +20,12 @@ namespace Intern.Controllers
     {
         private readonly InternContext _context;
         private readonly IMapper _mapper;
-        public MeetingsController(InternContext context, IMapper mapper)
+        private readonly IEmailService _emailService;
+        public MeetingsController(InternContext context, IMapper mapper, IEmailService emailService)
         {
             _context = context;
             _mapper = mapper;
+            _emailService = emailService;
         }
 
         // GET: api/Meetings
@@ -132,36 +137,109 @@ namespace Intern.Controllers
 
             var meeting = _mapper.Map<Meeting>(meetingDto);
 
-            meeting.RecordingPath ??= string.Empty;
-            if (meeting.IsRecorded && meeting.RecordingUploadedAt == null)
-                meeting.RecordingUploadedAt = DateOnly.FromDateTime(DateTime.UtcNow);
-
             _context.Meetings.Add(meeting);
             await _context.SaveChangesAsync();
 
             return CreatedAtAction(nameof(GetMeeting), new { id = meeting.Id }, meeting);
         }
 
-
-        // DELETE: api/Meetings/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteMeeting(int id)
         {
-            var meeting = await _context.Meetings.FindAsync(id);
-            if (meeting == null)
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            var meeting = await _context.Meetings
+                .Include(m => m.MeetingAttendees).ThenInclude(a => a.User)
+                .Include(m => m.Agenda)
+                .Include(m => m.Minutes)
+                .Include(m => m.Notifications)
+                .Include(m => m.Room)
+                .FirstOrDefaultAsync(m => m.Id == id);
+
+            if (meeting == null) return NotFound();
+
+            if (meeting.UserId != int.Parse(userId))
+                return Forbid("Only meeting organizer can delete");
+
+            var meetingDateTime = meeting.MeetingDate.ToDateTime(meeting.StartTime);
+            if (DateTime.Now >= meetingDateTime)
+                return BadRequest("Cannot delete meeting that has already started");
+
+            // ✅ Send emails to all attendees
+            foreach (var attendee in meeting.MeetingAttendees)
             {
-                return NotFound();
-            }
-            var checkMeetAttendeee = await _context.MeetingAttendees.AnyAsync(m => m.MeetingId == id);
-            if (checkMeetAttendeee)
-            {
-                return BadRequest("Meeting cannot be deleted since there are attandance");
+                var user = attendee.User;
+                if (user == null || string.IsNullOrWhiteSpace(user.Email)) continue;
+
+                var emailRequest = new EmailNotificationRequest
+                {
+                    To = user.Email,
+                    Subject = $"[Cancelled] Meeting: {meeting.Title}",
+                    RecipientName = $"{user.FirstName} {user.LastName}",
+                    EventType = "Meeting Cancellation",
+                    EventDescription = $"The meeting titled \"{meeting.Title}\" has been cancelled by the organizer.",
+                    MeetingTitle = meeting.Title,
+                    MeetingDate = meeting.MeetingDate.ToString("yyyy-MM-dd"),
+                    MeetingTime = meeting.StartTime.ToString("hh\\:mm"),
+                    MeetingDuration = $"{(meeting.EndTime - meeting.StartTime).TotalMinutes} minutes",
+                    RoomDetails = $"Room ID: {meeting.RoomId}",
+                    SentAt = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
+                };
+
+                _ = _emailService.SendMeetingNotificationAsync(emailRequest); // fire-and-forget
             }
 
             _context.Meetings.Remove(meeting);
             await _context.SaveChangesAsync();
 
             return NoContent();
+        }
+
+        // Add to your MeetingsController
+        [HttpGet("summary/monthly")]
+        public async Task<ActionResult<MeetingSummaryDto>> GetMonthlySummary()
+        {
+            var date = DateTime.UtcNow.AddDays(-30);
+            var count = await _context.Meetings
+                .Where(m => m.MeetingDate >= DateOnly.FromDateTime(date))
+                .CountAsync();
+
+            return Ok(new { count });
+        }
+
+        [HttpGet("summary/weekly")]
+        public async Task<ActionResult<MeetingSummaryDto>> GetWeeklySummary()
+        {
+            var date = DateTime.UtcNow.AddDays(-7);
+            var count = await _context.Meetings
+                .Where(m => m.MeetingDate >= DateOnly.FromDateTime(date))
+                .CountAsync();
+
+            return Ok(new { count });
+        }
+
+        [HttpGet("summary/most-used-room")]
+        public async Task<ActionResult> GetMostUsedRoom()
+        {
+            var result = await _context.Meetings
+                .GroupBy(m => m.RoomId)
+                .Select(g => new {
+                    RoomId = g.Key,
+                    Count = g.Count()
+                })
+                .OrderByDescending(x => x.Count)
+                .FirstOrDefaultAsync();
+
+            if (result == null)
+                return NotFound();
+
+            var room = await _context.Rooms.FindAsync(result.RoomId);
+
+            return Ok(new
+            {
+                roomNumber = room?.RoomNumber ?? "Unknown",
+                count = result.Count
+            });
         }
 
         private bool MeetingExists(int id)

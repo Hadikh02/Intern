@@ -72,10 +72,6 @@ public partial class InternContext : DbContext
                 .HasConversion(timeOnlyConverter)
                 .HasColumnType("time");
 
-            entity.Property(e => e.RecordingPath)
-                .HasMaxLength(255)
-                .IsUnicode(false);
-
             entity.Property(e => e.Title)
                 .HasMaxLength(100)
                 .IsUnicode(false);

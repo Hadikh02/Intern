@@ -12,8 +12,9 @@
 
         public string ItemNumber { get; set; } = null!;
 
-        public TimeOnly TimeAllocation { get; set; }
+        public int TimeAllocation { get; set; }
 
         public int MeetingId { get; set; }
+        public DateTime CreatedAt { get; set; }
     }
 }
